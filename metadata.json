@@ -1,0 +1,6 @@
+{
+  "name": "Aurium Network",
+  "description": "Unified dark-luxury decentralized mobile node network with real-time validator status, halving emissions, presale portal, and live admin controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

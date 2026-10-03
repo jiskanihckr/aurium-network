@@ -1,0 +1,114 @@
+import { AuriumState } from '../types';
+
+export const defaultAuriumState: AuriumState = {
+  network: {
+    isOnline: true,
+    activeNodes: 45210,
+    blockHeight: 3841920,
+    baseDailyYield: 25.50,
+    networkLatencyMs: 42,
+    tps: 1840,
+  },
+  deposits: {
+    enabled: true,
+    chains: {
+      bep20: true,
+      erc20: true,
+      trc20: true,
+    },
+  },
+  presale: {
+    enabled: true,
+    round: 'Round 1',
+    progressPercent: 75,
+    totalAllocation: 10000000,
+    raisedUsdt: 375000,
+    minDepositUsdt: 50,
+    rateUsdtPerAuri: 0.05,
+  },
+  withdrawals: {
+    enabled: true,
+    minWithdrawalAuri: 100,
+  },
+  p2pTransfers: {
+    enabled: true,
+  },
+  halving: {
+    nextHalvingDate: new Date(Date.now() + 14 * 24 * 3600 * 1000 + 7 * 3600 * 1000 + 42 * 60 * 1000).toISOString(),
+    currentEra: 1,
+    totalHalvingsTriggered: 0,
+    halvingHistory: [
+      {
+        id: 'halv-genesis',
+        timestamp: '2026-08-15T00:00:00.000Z',
+        previousYield: 51.00,
+        newYield: 25.50,
+        blockHeight: 2500000,
+      }
+    ],
+  },
+  depositAddresses: {
+    bep20: '0x71C8F893b827e44C5972877B68114949a2a7d79b',
+    trc20: 'TKs9N8r1eQYp3u1Z4r87L2V4N7M1X8E9aP',
+    erc20: '0x32A4F23b817e75B10872658B86884149b1a5e12e',
+  },
+  apk: {
+    version: 'v1.0.2',
+    downloadUrl: 'https://cdn.aurium.network/builds/aurium-light-validator-v1.0.2.apk',
+    fileSize: '18.4 MB',
+    sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    releaseDate: 'October 2026',
+    minAndroidVersion: 'Android 9.0 (API 28)+',
+  },
+  txids: [
+    {
+      id: 'tx-1001',
+      userWallet: '0x948B...3F21',
+      network: 'BEP-20',
+      amountUsdt: 1250,
+      txid: '0x8f2d59e38d726b21901a884fc57ba4b2762b1464c8d76e48e89f893457a41201',
+      timestamp: '2026-10-02T11:45:00.000Z',
+      status: 'pending',
+      note: 'Presale Round 1 allocation tier 2',
+    },
+    {
+      id: 'tx-1002',
+      userWallet: 'TDz8...9Km2',
+      network: 'TRC-20',
+      amountUsdt: 500,
+      txid: 'd9b73489110cf90021b778216b801df072120489ba10279618b7617b819f7129',
+      timestamp: '2026-10-02T10:12:00.000Z',
+      status: 'approved',
+      note: 'Auto-verified node staking deposit',
+    },
+    {
+      id: 'tx-1003',
+      userWallet: '0x43C1...8A09',
+      network: 'ERC-20',
+      amountUsdt: 3000,
+      txid: '0x5c4238e88bb912389dc4260aa785532b6e15904f6479015949d975618b1089ca',
+      timestamp: '2026-10-02T09:30:00.000Z',
+      status: 'pending',
+      note: 'Validator cluster license reserve',
+    },
+    {
+      id: 'tx-1004',
+      userWallet: '0x17D2...AA41',
+      network: 'BEP-20',
+      amountUsdt: 250,
+      txid: '0x12c4908ba891d0923fbc0159419047124ba185012dc8716295819058b7a61234',
+      timestamp: '2026-10-01T22:15:00.000Z',
+      status: 'approved',
+    },
+    {
+      id: 'tx-1005',
+      userWallet: 'TPa1...71B8',
+      network: 'TRC-20',
+      amountUsdt: 25,
+      txid: 'aa8823901b78290f6b781190456b1029487c8012b5910287a9187b50291ba681',
+      timestamp: '2026-10-01T18:04:00.000Z',
+      status: 'rejected',
+      note: 'Below minimum deposit requirement ($50 USDT)',
+    },
+  ],
+};

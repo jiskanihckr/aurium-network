@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #090C10;
+  --color-canvas-end: #0E131A;
+  --color-surface: #131822;
+  --color-surface-hover: #18202E;
+  --color-surface-raised: #1C2433;
+  --color-well: #070A0E;
+  --color-border-subtle: #1F2736;
+  --color-border-default: #2C3547;
+  --color-border-hover: #3E4B63;
+  --color-gold: #F5A623;
+  --color-gold-light: #FFBA3B;
+  --color-gold-muted: rgba(245, 166, 35, 0.15);
+  --color-gold-glow: rgba(245, 166, 35, 0.45);
+  --color-cyan: #58A6FF;
+  --color-cyan-glow: rgba(88, 166, 255, 0.3);
+  --color-success: #238636;
+  --color-success-glow: rgba(35, 134, 54, 0.4);
+  --color-danger: #DA3633;
+  --color-text-primary: #F0F6FC;
+  --color-text-muted: #8B949E;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@layer base {
+  body {
+    background: radial-gradient(ellipse at 50% 0%, #0E141D 0%, #0A0D12 60%, #07090D 100%);
+    background-color: #090C10;
+    color: #F0F6FC;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+}
+
+/* Custom subtle dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #090C10;
+}
+::-webkit-scrollbar-thumb {
+  background: #1F2736;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2C3547;
+}
+
+/* Glassmorphic Luxury Neumorphic Cards */
+.aurium-card {
+  background: radial-gradient(circle at 15% 0%, rgba(245, 166, 35, 0.06) 0%, rgba(255, 255, 255, 0.02) 20%, #131822 60%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(245, 166, 35, 0.25);
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(245, 166, 35, 0.05);
+}
+
+.aurium-card-interactive {
+  background: radial-gradient(circle at 15% 0%, rgba(245, 166, 35, 0.08) 0%, rgba(255, 255, 255, 0.03) 25%, #131822 65%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(245, 166, 35, 0.3);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+.aurium-card-interactive:hover {
+  border-color: rgba(245, 166, 35, 0.45);
+  background: radial-gradient(circle at 15% 0%, rgba(245, 166, 35, 0.12) 0%, rgba(255, 255, 255, 0.04) 30%, #161D2A 70%);
+  box-shadow: 0 25px 50px -5px rgba(0, 0, 0, 0.85), 0 0 35px -5px rgba(245, 166, 35, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Recessed Wells (for inputs, addresses, deep containers) */
+.recessed-well {
+  background-color: #070A0E;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.85), inset 0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+/* Gold Glowing Text */
+.gold-glow-text {
+  text-shadow: 0 0 18px rgba(245, 166, 35, 0.5), 0 0 35px rgba(245, 166, 35, 0.25);
+}
+
+.cyan-glow-text {
+  text-shadow: 0 0 18px rgba(88, 166, 255, 0.5), 0 0 35px rgba(88, 166, 255, 0.25);
+}
+
+/* Pill Capsule Buttons with Glossy Metallic Finish & Gold Neon Glow */
+.btn-gold-capsule {
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #FFBE42 0%, #F5A623 55%, #CF850E 100%);
+  color: #070A0E;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: 0 0 25px rgba(245, 166, 35, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 4px 15px rgba(0, 0, 0, 0.5);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid #FFE082;
+}
+
+.btn-gold-capsule:hover {
+  background: linear-gradient(180deg, #FFC95C 0%, #F8B036 55%, #DE921A 100%);
+  box-shadow: 0 0 35px rgba(245, 166, 35, 0.65), 0 0 65px rgba(245, 166, 35, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.6), 0 6px 20px rgba(0, 0, 0, 0.6);
+  transform: translateY(-1px) scale(1.01);
+}
+
+.btn-dark-capsule {
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #1A2230 0%, #111621 100%);
+  color: #F0F6FC;
+  font-weight: 600;
+  border: 1px solid rgba(245, 166, 35, 0.3);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-dark-capsule:hover {
+  border-color: rgba(245, 166, 35, 0.8);
+  background: linear-gradient(180deg, #222B3D 0%, #151B28 100%);
+  box-shadow: 0 0 25px rgba(245, 166, 35, 0.35), 0 6px 20px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  color: #F5A623;
+  transform: translateY(-1px);
+}
+
+/* Halving Circular Orbital Gauge Animations */
+@keyframes orbitSpinClockwise {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbitSpinCounterClockwise {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes corePulsingAura {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(245, 166, 35, 0.25), inset 0 0 20px rgba(245, 166, 35, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 50px rgba(245, 166, 35, 0.5), 0 0 80px rgba(245, 166, 35, 0.2), inset 0 0 35px rgba(245, 166, 35, 0.3);
+  }
+}
+
+.orbit-spin {
+  animation: orbitSpinClockwise 20s linear infinite;
+}
+
+.orbit-spin-reverse {
+  animation: orbitSpinCounterClockwise 14s linear infinite;
+}
+
+.orbit-spin-fast {
+  animation: orbitSpinClockwise 8s linear infinite;
+}
+
+.core-pulse-aura {
+  animation: corePulsingAura 3s ease-in-out infinite;
+}
+
+.pulse-beacon {
+  animation: pulseBeacon 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulseBeacon {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.15);
+  }
+}
