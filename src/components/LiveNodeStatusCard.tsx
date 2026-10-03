@@ -25,7 +25,7 @@ export const LiveNodeStatusCard: React.FC<LiveNodeStatusCardProps> = ({ state, o
   return (
     <div
       id="node-network"
-      className="aurium-card rounded-3xl p-5 sm:p-8 border border-[#21262D] relative overflow-hidden flex flex-col justify-between"
+      className="aurium-card rounded-3xl p-4 sm:p-5 lg:p-8 border border-[#21262D] relative w-full max-w-full overflow-hidden flex flex-col justify-between"
     >
       {/* Ambient background glow */}
       <div className="absolute top-0 right-0 w-48 h-48 bg-[#F5A623]/10 blur-[85px] pointer-events-none rounded-full" />

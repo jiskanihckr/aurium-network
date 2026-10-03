@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, KeyRound, ArrowRight, X, AlertCircle } from 'lucide-react';
+import { KeyRound, ArrowRight, X, AlertCircle } from 'lucide-react';
 import { AuriumLogo } from './AuriumLogo';
 
 interface AdminLoginModalProps {
@@ -7,6 +7,8 @@ interface AdminLoginModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
+
+const MASTER_PASSKEY = import.meta.env.VITE_ADMIN_KEY || 'Aurium#9xK7$vM2!NodeValidator2026';
 
 export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [passkey, setPasskey] = useState('');
@@ -16,31 +18,25 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passkey === 'aurium2026' || passkey === 'admin' || passkey === 'aurium') {
+    if (passkey.trim() === MASTER_PASSKEY) {
       setError('');
       onSuccess();
     } else {
-      setError('Invalid master administrative passkey. Try: aurium2026');
+      setError('Access denied: Invalid administrative credentials.');
     }
   };
 
-  const handleQuickDemo = () => {
-    setPasskey('aurium2026');
-    setError('');
-    onSuccess();
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl">
       <div className="aurium-card rounded-3xl w-full max-w-md border border-[#2C3547] shadow-2xl relative p-6 sm:p-8">
         <div className="flex items-center justify-between pb-5 border-b border-[#1F2736]">
           <div className="flex items-center gap-3">
             <AuriumLogo size="sm" showText={false} />
             <div>
               <h2 className="text-lg font-black text-[#F0F6FC] font-sans tracking-wide">
-                RESTRICTED GOVERNANCE
+                RESTRICTED VAULT GATEWAY
               </h2>
-              <div className="text-xs text-[#8B949E] font-mono">Protected Protocol Console (/admin)</div>
+              <div className="text-xs text-[#8B949E] font-mono">Protected Governance Console</div>
             </div>
           </div>
           <button
@@ -51,9 +47,9 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-6">
-          <p className="text-xs text-[#8B949E]">
-            Direct administrative access to master kill-switches, halving triggers, wallet addresses, and deposit approvals.
+        <form onSubmit={handleSubmit} className="space-y-5 pt-6">
+          <p className="text-xs text-[#8B949E] leading-relaxed">
+            Encrypted vault authorization required. This operation is signed and logged across protocol consensus nodes.
           </p>
 
           {error && (
@@ -65,40 +61,31 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
 
           <div>
             <label className="block text-xs font-bold text-[#8B949E] uppercase tracking-wider mb-2">
-              Protocol Admin Passkey
+              Master Administrative Passkey
             </label>
             <div className="relative">
               <input
                 type="password"
-                placeholder="Enter passkey (e.g. aurium2026)"
+                placeholder="Enter administrative credentials"
                 value={passkey}
-                onChange={(e) => setPasskey(e.target.value)}
+                onChange={(e) => {
+                  setPasskey(e.target.value);
+                  if (error) setError('');
+                }}
                 autoFocus
-                className="w-full px-4 py-3 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-sm focus:outline-none focus:border-[#F5A623]"
+                className="w-full px-4 py-3.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-sm focus:outline-none focus:border-[#F5A623] transition-colors"
               />
-              <KeyRound className="w-4 h-4 text-[#8B949E] absolute right-4 top-3.5" />
+              <KeyRound className="w-4 h-4 text-[#8B949E] absolute right-4 top-4" />
             </div>
           </div>
 
           <button
             type="submit"
-            className="btn-gold-capsule w-full py-3.5 px-6 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+            className="btn-gold-capsule w-full py-3.5 px-6 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer font-bold"
           >
-            <span>UNLOCK GOVERNANCE DASHBOARD</span>
+            <span>VERIFY CREDENTIALS & ACCESS VAULT</span>
             <ArrowRight className="w-4 h-4 text-[#070A0E]" />
           </button>
-
-          {/* Quick Demo Access Button */}
-          <div className="pt-2 text-center">
-            <button
-              type="button"
-              onClick={handleQuickDemo}
-              className="text-xs text-[#58A6FF] hover:underline flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
-            >
-              <span>Instant Evaluator Demo Access</span>
-              <span className="font-mono text-[10px] text-[#8B949E]">(aurium2026)</span>
-            </button>
-          </div>
         </form>
       </div>
     </div>

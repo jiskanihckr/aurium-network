@@ -1,5 +1,5 @@
 import React from 'react';
-import { Coins, Sparkles, ArrowRight } from 'lucide-react';
+import { Coins, Sparkles, ArrowRight, AlertTriangle } from 'lucide-react';
 import { AuriumState } from '../types';
 
 interface PresaleCardProps {
@@ -9,14 +9,15 @@ interface PresaleCardProps {
 
 export const PresaleCard: React.FC<PresaleCardProps> = ({ state, onOpenPresaleModal }) => {
   const percent = state.presale.progressPercent;
-  const isPresaleActive = state.presale.enabled;
+  const isPresaleActive = state.presale.enabled && state.presale.status === 'active';
   const allocation = state.presale.totalAllocation;
   const auriSold = Math.floor(allocation * (percent / 100));
+  const activeRoundData = state.presale.rounds ? state.presale.rounds[state.presale.activeRoundId] : null;
 
   return (
     <div
       id="presale"
-      className="aurium-card rounded-3xl p-5 sm:p-8 border border-[#21262D] relative overflow-hidden flex flex-col justify-between"
+      className="aurium-card rounded-3xl p-4 sm:p-5 lg:p-8 border border-[#21262D] relative w-full max-w-full overflow-hidden flex flex-col justify-between"
     >
       {/* Background ambient lighting */}
       <div className="absolute top-0 left-1/3 w-60 h-60 bg-[#F5A623]/10 blur-[100px] pointer-events-none rounded-full" />
@@ -30,13 +31,35 @@ export const PresaleCard: React.FC<PresaleCardProps> = ({ state, onOpenPresaleMo
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">TOKEN ALLOCATION</p>
-              <h3 className="text-lg font-bold text-[#F5A623] tracking-tight">Strategic Presale</h3>
+              <h3 className="text-lg font-bold text-[#F5A623] tracking-tight">
+                {activeRoundData ? activeRoundData.shortName : 'Strategic Presale'}
+              </h3>
             </div>
           </div>
-          <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
-            {isPresaleActive ? `${state.presale.round.toUpperCase()} ACTIVE` : 'PAUSED'}
+          <span
+            className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider border whitespace-nowrap ${
+              state.presale.status === 'active' && state.presale.enabled
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                : state.presale.status === 'coming_soon'
+                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                : 'bg-red-500/10 text-red-400 border-red-500/30'
+            }`}
+          >
+            {state.presale.status === 'coming_soon'
+              ? `${state.presale.round.toUpperCase()} COMING SOON`
+              : state.presale.status === 'active' && state.presale.enabled
+              ? `${state.presale.round.toUpperCase()} ACTIVE`
+              : 'PAUSED'}
           </span>
         </div>
+
+        {/* Active Notification Banner */}
+        {state.presale.notificationBanner && (
+          <div className="mb-4 p-2.5 rounded-xl bg-[#F5A623]/10 border border-[#F5A623]/30 text-[11px] text-[#FFE082] flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#F5A623] shrink-0 animate-ping" />
+            <span className="leading-tight font-medium">{state.presale.notificationBanner}</span>
+          </div>
+        )}
 
         {/* Allocation Numbers in Clean Sub-Boxes */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4">
@@ -69,7 +92,7 @@ export const PresaleCard: React.FC<PresaleCardProps> = ({ state, onOpenPresaleMo
           </div>
         </div>
 
-        {/* Presale Progress Bar (75%) */}
+        {/* Presale Progress Bar */}
         <div className="recessed-well rounded-2xl p-3.5 sm:p-4 mb-5 border border-[#21262D]">
           <div className="flex items-center justify-between text-xs mb-2">
             <span className="text-[#8B949E] flex items-center gap-1.5 font-semibold uppercase text-[10px] tracking-wider">
@@ -150,7 +173,11 @@ export const PresaleCard: React.FC<PresaleCardProps> = ({ state, onOpenPresaleMo
         }`}
       >
         <span>
-          {isPresaleActive && state.deposits.enabled ? 'JOIN PRESALE / DEPOSIT NOW' : 'PRESALE CURRENTLY PAUSED'}
+          {state.presale.status === 'coming_soon'
+            ? `${state.presale.round.toUpperCase()} STARTS SOON`
+            : isPresaleActive && state.deposits.enabled
+            ? `JOIN ${state.presale.round.toUpperCase()} / DEPOSIT NOW`
+            : 'PRESALE CURRENTLY PAUSED'}
         </span>
         <ArrowRight className="w-4 h-4 text-[#070A0E]" />
       </button>

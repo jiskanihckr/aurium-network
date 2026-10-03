@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { AuriumState, TxidDeposit, NetworkChain, PartialAuriumState } from '../types';
+import { AuriumState, TxidDeposit, NetworkChain, PartialAuriumState, PresaleRoundId, PresaleRoundConfig } from '../types';
 import { defaultAuriumState } from '../data/initialState';
 
 const LOCAL_STORAGE_KEY = 'aurium_network_state_v1';
@@ -115,7 +115,6 @@ export function useAuriumState() {
 
   // API Mutators
   const updateToggles = useCallback(async (partialState: PartialAuriumState) => {
-    // Optimistic local update
     setState((prev) => {
       const updated: AuriumState = {
         ...prev,
@@ -129,7 +128,13 @@ export function useAuriumState() {
                 : prev.deposits.chains,
             }
           : prev.deposits,
-        presale: partialState.presale ? { ...prev.presale, ...partialState.presale } : prev.presale,
+        presale: partialState.presale
+          ? {
+              ...prev.presale,
+              ...(partialState.presale.enabled !== undefined ? { enabled: partialState.presale.enabled } : {}),
+              ...(partialState.presale.status ? { status: partialState.presale.status as 'active' | 'paused' | 'coming_soon' } : {}),
+            }
+          : prev.presale,
         withdrawals: partialState.withdrawals ? { ...prev.withdrawals, ...partialState.withdrawals } : prev.withdrawals,
         p2pTransfers: partialState.p2pTransfers ? { ...prev.p2pTransfers, ...partialState.p2pTransfers } : prev.p2pTransfers,
       };
@@ -152,6 +157,59 @@ export function useAuriumState() {
       }
     } catch (e) {
       console.warn('Network toggle API call failed, kept locally', e);
+    }
+  }, [saveStateToLocal, updateStateInternal]);
+
+  // Dedicated 3-Round Presale Management Mutator
+  const updatePresaleConfig = useCallback(async (config: {
+    activeRoundId?: PresaleRoundId;
+    status?: 'active' | 'paused' | 'coming_soon';
+    notificationBanner?: string;
+    rounds?: Record<PresaleRoundId, PresaleRoundConfig>;
+    minDepositUsdt?: number;
+    enabled?: boolean;
+  }) => {
+    setState((prev) => {
+      const activeId = config.activeRoundId || prev.presale.activeRoundId;
+      const updatedRounds = config.rounds ? { ...prev.presale.rounds, ...config.rounds } : prev.presale.rounds;
+      const activeRoundData = updatedRounds[activeId];
+
+      const updated: AuriumState = {
+        ...prev,
+        presale: {
+          ...prev.presale,
+          activeRoundId: activeId,
+          status: config.status || prev.presale.status,
+          notificationBanner: config.notificationBanner !== undefined ? config.notificationBanner : prev.presale.notificationBanner,
+          enabled: config.enabled !== undefined ? config.enabled : prev.presale.enabled,
+          minDepositUsdt: config.minDepositUsdt !== undefined ? config.minDepositUsdt : prev.presale.minDepositUsdt,
+          rounds: updatedRounds,
+          round: activeRoundData.shortName,
+          rateUsdtPerAuri: activeRoundData.priceUsdt,
+          totalAllocation: activeRoundData.totalAllocation,
+          raisedUsdt: activeRoundData.raisedUsdt,
+          progressPercent: activeRoundData.progressPercent,
+        },
+      };
+      saveStateToLocal(updated);
+      if (channelRef.current) {
+        channelRef.current.postMessage({ type: 'STATE_BROADCAST', state: updated });
+      }
+      return updated;
+    });
+
+    try {
+      const res = await fetch('/api/admin/presale-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.state) updateStateInternal(data.state);
+      }
+    } catch (e) {
+      console.warn('Presale config API call failed', e);
     }
   }, [saveStateToLocal, updateStateInternal]);
 
@@ -269,13 +327,23 @@ export function useAuriumState() {
     }
   }, [saveStateToLocal, updateStateInternal]);
 
-  const updateHalvingDate = useCallback(async (dateIso: string) => {
+  // Manual Halving Timelock & Emission Control
+  const updateHalvingParams = useCallback(async (params: {
+    baseDailyYield?: number;
+    currentEra?: number;
+    nextHalvingDate?: string;
+  }) => {
     setState((prev) => {
       const updated: AuriumState = {
         ...prev,
+        network: {
+          ...prev.network,
+          baseDailyYield: params.baseDailyYield !== undefined ? params.baseDailyYield : prev.network.baseDailyYield,
+        },
         halving: {
           ...prev.halving,
-          nextHalvingDate: dateIso,
+          currentEra: params.currentEra !== undefined ? params.currentEra : prev.halving.currentEra,
+          nextHalvingDate: params.nextHalvingDate || prev.halving.nextHalvingDate,
         },
       };
       saveStateToLocal(updated);
@@ -289,16 +357,20 @@ export function useAuriumState() {
       const res = await fetch('/api/admin/halving', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nextHalvingDate: dateIso }),
+        body: JSON.stringify(params),
       });
       if (res.ok) {
         const data = await res.json();
         if (data.state) updateStateInternal(data.state);
       }
     } catch (e) {
-      console.warn('Halving date update failed', e);
+      console.warn('Halving manual params update failed', e);
     }
   }, [saveStateToLocal, updateStateInternal]);
+
+  const updateHalvingDate = useCallback(async (dateIso: string) => {
+    return updateHalvingParams({ nextHalvingDate: dateIso });
+  }, [updateHalvingParams]);
 
   const handleTxidAction = useCallback(async (id: string, action: 'approve' | 'reject', note?: string) => {
     const finalStatus: 'approved' | 'rejected' = action === 'approve' ? 'approved' : 'rejected';
@@ -315,11 +387,21 @@ export function useAuriumState() {
       const additionalRaised = action === 'approve' && matched ? matched.amountUsdt : 0;
       const additionalNodes = action === 'approve' && matched ? Math.floor(matched.amountUsdt / 10) : 0;
 
+      const activeId = prev.presale.activeRoundId;
+      const updatedRounds = { ...prev.presale.rounds };
+      if (updatedRounds[activeId] && action === 'approve') {
+        const r = updatedRounds[activeId];
+        r.raisedUsdt += additionalRaised;
+        r.progressPercent = Math.min(100, Number(((r.raisedUsdt / r.targetCapUsdt) * 100).toFixed(1)));
+      }
+
       const updated: AuriumState = {
         ...prev,
         presale: {
           ...prev.presale,
           raisedUsdt: prev.presale.raisedUsdt + additionalRaised,
+          progressPercent: updatedRounds[activeId] ? updatedRounds[activeId].progressPercent : prev.presale.progressPercent,
+          rounds: updatedRounds,
         },
         network: {
           ...prev.network,
@@ -355,7 +437,10 @@ export function useAuriumState() {
     amountUsdt: number;
     txid: string;
     note?: string;
+    proofImageBase64?: string;
+    round?: string;
   }) => {
+    const currentRound = data.round || state.presale.round || 'Round 1';
     const newTxid: TxidDeposit = {
       id: `tx-${Date.now()}`,
       userWallet: data.userWallet,
@@ -364,7 +449,9 @@ export function useAuriumState() {
       txid: data.txid,
       timestamp: new Date().toISOString(),
       status: 'pending',
-      note: data.note || 'Public presale portal deposit',
+      note: data.note || `Presale ${currentRound} portal deposit`,
+      proofImageBase64: data.proofImageBase64,
+      round: currentRound,
     };
 
     setState((prev) => {
@@ -383,7 +470,7 @@ export function useAuriumState() {
       const res = await fetch('/api/user/submit-txid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, round: currentRound }),
       });
       if (res.ok) {
         const resData = await res.json();
@@ -392,7 +479,7 @@ export function useAuriumState() {
     } catch (e) {
       console.warn('User submit TXID call failed', e);
     }
-  }, [saveStateToLocal, updateStateInternal]);
+  }, [saveStateToLocal, state.presale.round, updateStateInternal]);
 
   const resetToDefaults = useCallback(async () => {
     setState(defaultAuriumState);
@@ -417,9 +504,11 @@ export function useAuriumState() {
     isConnected,
     lastSyncTime,
     updateToggles,
+    updatePresaleConfig,
     updateAddresses,
     updateApk,
     triggerHalvingCut,
+    updateHalvingParams,
     updateHalvingDate,
     handleTxidAction,
     submitDepositTxid,

@@ -19,6 +19,48 @@ export const defaultAuriumState: AuriumState = {
   },
   presale: {
     enabled: true,
+    activeRoundId: 'round_1',
+    status: 'active',
+    notificationBanner: 'Round 1 Active: Allocation 75% subscribed. Seed tier unlocks validator privileges.',
+    rounds: {
+      round_1: {
+        id: 'round_1',
+        name: 'Round 1 (Seed / Early Validator)',
+        shortName: 'Round 1',
+        badgeLabel: 'SEED / EARLY VALIDATOR',
+        priceUsdt: 0.05,
+        totalAllocation: 10000000,
+        targetCapUsdt: 500000,
+        raisedUsdt: 375000,
+        progressPercent: 75,
+        status: 'active',
+      },
+      round_2: {
+        id: 'round_2',
+        name: 'Round 2 (Strategic Private)',
+        shortName: 'Round 2',
+        badgeLabel: 'STRATEGIC PRIVATE',
+        priceUsdt: 0.08,
+        totalAllocation: 15000000,
+        targetCapUsdt: 1200000,
+        raisedUsdt: 0,
+        progressPercent: 0,
+        status: 'upcoming',
+      },
+      round_3: {
+        id: 'round_3',
+        name: 'Round 3 (Public Pre-Listing)',
+        shortName: 'Round 3',
+        badgeLabel: 'PUBLIC PRE-LISTING',
+        priceUsdt: 0.12,
+        totalAllocation: 25000000,
+        targetCapUsdt: 3000000,
+        raisedUsdt: 0,
+        progressPercent: 0,
+        status: 'upcoming',
+      },
+    },
+    // Projection of currently active round:
     round: 'Round 1',
     progressPercent: 75,
     totalAllocation: 10000000,
@@ -70,6 +112,7 @@ export const defaultAuriumState: AuriumState = {
       timestamp: '2026-10-02T11:45:00.000Z',
       status: 'pending',
       note: 'Presale Round 1 allocation tier 2',
+      round: 'Round 1',
     },
     {
       id: 'tx-1002',
@@ -80,6 +123,7 @@ export const defaultAuriumState: AuriumState = {
       timestamp: '2026-10-02T10:12:00.000Z',
       status: 'approved',
       note: 'Auto-verified node staking deposit',
+      round: 'Round 1',
     },
     {
       id: 'tx-1003',
@@ -90,6 +134,7 @@ export const defaultAuriumState: AuriumState = {
       timestamp: '2026-10-02T09:30:00.000Z',
       status: 'pending',
       note: 'Validator cluster license reserve',
+      round: 'Round 1',
     },
     {
       id: 'tx-1004',
@@ -99,6 +144,7 @@ export const defaultAuriumState: AuriumState = {
       txid: '0x12c4908ba891d0923fbc0159419047124ba185012dc8716295819058b7a61234',
       timestamp: '2026-10-01T22:15:00.000Z',
       status: 'approved',
+      round: 'Round 1',
     },
     {
       id: 'tx-1005',
@@ -109,6 +155,7 @@ export const defaultAuriumState: AuriumState = {
       timestamp: '2026-10-01T18:04:00.000Z',
       status: 'rejected',
       note: 'Below minimum deposit requirement ($50 USDT)',
+      round: 'Round 1',
     },
   ],
 };

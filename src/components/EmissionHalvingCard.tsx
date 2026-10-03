@@ -14,7 +14,7 @@ export const EmissionHalvingCard: React.FC<EmissionHalvingCardProps> = ({ state 
   return (
     <div
       id="halving"
-      className="aurium-card rounded-3xl p-5 sm:p-8 border border-[#21262D] relative overflow-hidden flex flex-col justify-between"
+      className="aurium-card rounded-3xl p-4 sm:p-5 lg:p-8 border border-[#21262D] relative w-full max-w-full overflow-hidden flex flex-col justify-between"
     >
       {/* Background ambient lighting */}
       <div className="absolute top-0 right-1/4 w-52 h-52 bg-[#F5A623]/10 blur-[90px] pointer-events-none rounded-full" />
@@ -38,8 +38,15 @@ export const EmissionHalvingCard: React.FC<EmissionHalvingCardProps> = ({ state 
           </span>
         </div>
 
-        {/* Concentric Circular Orbital Gauge with Responsive Scaling */}
-        <div className="my-2 sm:my-4 flex items-center justify-center">
+        {/* Concentric Circular Orbital Gauge with Responsive Scaling and Ambient Aura */}
+        <div className="my-2 sm:my-4 flex items-center justify-center relative">
+          <div
+            className="absolute w-56 h-56 pointer-events-none rounded-full animate-pulse"
+            style={{
+              background: 'radial-gradient(ellipse at center, rgba(245,166,35,0.12) 0%, transparent 70%)',
+              animationDuration: '5s',
+            }}
+          />
           <CircularHalvingGauge
             targetDateIso={state.halving.nextHalvingDate}
             currentEra={state.halving.currentEra}

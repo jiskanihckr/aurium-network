@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Copy, Check, QrCode, AlertCircle, CheckCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Copy, Check, QrCode, AlertCircle, CheckCircle, ArrowRight, ShieldCheck, Upload, Image as ImageIcon } from 'lucide-react';
 import { AuriumState, NetworkChain } from '../types';
 import { AuriumLogo } from './AuriumLogo';
 
@@ -13,6 +13,8 @@ interface PresaleDepositModalProps {
     amountUsdt: number;
     txid: string;
     note?: string;
+    proofImageBase64?: string;
+    round?: string;
   }) => Promise<void>;
 }
 
@@ -31,9 +33,12 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
   const [formAmount, setFormAmount] = useState('250');
   const [formTxid, setFormTxid] = useState('');
   const [formNote, setFormNote] = useState('');
+  const [proofImageBase64, setProofImageBase64] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
 
@@ -58,6 +63,22 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('Screenshot file size must be less than 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProofImageBase64(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleTxidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -72,7 +93,7 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
       return;
     }
     if (!formTxid.trim()) {
-      setErrorMsg('Please paste the blockchain Transaction Hash (TXID).');
+      setErrorMsg('Please enter your Transaction Hash (TXID).');
       return;
     }
 
@@ -84,6 +105,8 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
         amountUsdt: amount,
         txid: formTxid.trim(),
         note: formNote.trim() || undefined,
+        proofImageBase64: proofImageBase64 || undefined,
+        round: state.presale.round,
       });
       setIsSubmitting(false);
       setSubmitSuccess(true);
@@ -120,11 +143,16 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Network Chain Pill Selectors */}
+          {/* Step 1: Network Selection */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#8B949E] mb-2.5">
-              Select Deposit Network
-            </label>
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="w-5 h-5 rounded-full bg-[#F5A623] text-[#070A0E] text-[11px] font-black flex items-center justify-center font-mono">
+                1
+              </span>
+              <label className="text-xs font-bold uppercase tracking-wider text-[#F0F6FC]">
+                Select Deposit Network (USDT)
+              </label>
+            </div>
             <div className="grid grid-cols-3 gap-2.5">
               {(['BEP-20', 'TRC-20', 'ERC-20'] as NetworkChain[]).map((chain) => {
                 const enabled =
@@ -170,7 +198,7 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
             </div>
           )}
 
-          {/* Recessed Address Box & QR */}
+          {/* Official Receiving Address with QR & Copy */}
           <div className="recessed-well rounded-2xl p-5 border border-[#1F2736] space-y-3.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-[#8B949E] uppercase tracking-wider text-[11px] font-semibold">
@@ -211,31 +239,31 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
                 </svg>
               </div>
 
-              {/* Address details & Copy Pill Button */}
+              {/* Address details & One-Click Copy Button */}
               <div className="flex-1 w-full space-y-2.5">
                 <div className="p-3 rounded-xl bg-[#090C10] border border-[#1F2736] font-mono text-xs text-[#F0F6FC] break-all select-all">
                   {currentAddress}
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-[11px] text-[#8B949E]">
-                    Deposit only USDT ({selectedChain}) to this address.
+                    Deposit strictly USDT ({selectedChain}) to this address.
                   </span>
                   <button
                     onClick={handleCopy}
-                    className="btn-gold-capsule px-4 py-2 text-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                    className="btn-gold-capsule px-4 py-2 text-xs flex items-center gap-1.5 shrink-0 cursor-pointer font-bold"
                   >
                     {copied ? <Check className="w-3.5 h-3.5 text-[#070A0E]" /> : <Copy className="w-3.5 h-3.5 text-[#070A0E]" />}
-                    <span>{copied ? 'COPIED' : 'COPY ADDRESS'}</span>
+                    <span>{copied ? 'COPIED' : 'ONE-CLICK COPY'}</span>
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Recessed Calculator Well */}
+          {/* Calculator Well */}
           <div className="recessed-well rounded-2xl p-4 border border-[#1F2736]">
             <div className="flex items-center justify-between text-xs text-[#8B949E] mb-2 font-semibold uppercase text-[11px]">
-              <span>TOKEN ESTIMATOR</span>
+              <span>ALLOCATION ESTIMATOR</span>
               <span className="font-mono text-[#F5A623]">1 AURI = ${state.presale.rateUsdtPerAuri} USDT</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
@@ -272,24 +300,34 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
             </div>
           </div>
 
-          {/* TXID Submission Form */}
+          {/* Step 2 & 3: TXID Submission & Proof Verification Form */}
           <div className="pt-2 border-t border-[#1F2736]">
-            <h3 className="text-sm font-black uppercase tracking-wider text-[#F0F6FC] mb-1 flex items-center gap-2">
-              <span>SUBMIT DEPOSIT TXID FOR VERIFICATION</span>
-            </h3>
-            <p className="text-xs text-[#8B949E] mb-4">
-              Enter your transaction hash below. Real-time protocol listeners will process your verification instantly.
-            </p>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="w-5 h-5 rounded-full bg-[#F5A623] text-[#070A0E] text-[11px] font-black flex items-center justify-center font-mono">
+                2
+              </span>
+              <h3 className="text-sm font-black uppercase tracking-wider text-[#F0F6FC]">
+                Transaction Hash / TXID Verification
+              </h3>
+            </div>
+
+            {/* Required Verification Notice */}
+            <div className="p-3 rounded-xl bg-[#58A6FF]/10 border border-[#58A6FF]/30 text-xs text-[#58A6FF] mb-4">
+              Enter your TXID. Submissions are queued for validator hash verification. Allocation balances update upon network confirmation.
+            </div>
 
             {submitSuccess ? (
               <div className="recessed-well rounded-2xl p-6 border border-[#238636]/40 text-center space-y-2">
                 <CheckCircle className="w-9 h-9 text-[#238636] mx-auto" />
                 <div className="text-base font-extrabold text-[#F0F6FC]">Deposit TXID Successfully Queued!</div>
                 <div className="text-xs text-[#8B949E] max-w-md mx-auto">
-                  Your transaction has been broadcasted to the protocol queue. You can check your node status once confirmed on-chain.
+                  Your transaction has been queued for validator hash verification. Allocation balances update upon network confirmation.
                 </div>
                 <button
-                  onClick={() => setSubmitSuccess(false)}
+                  onClick={() => {
+                    setSubmitSuccess(false);
+                    setProofImageBase64(null);
+                  }}
                   className="mt-3 text-xs text-[#F5A623] hover:underline uppercase tracking-wider font-bold"
                 >
                   Submit Another Transaction
@@ -336,16 +374,64 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
 
                 <div>
                   <label className="block text-[10px] text-[#8B949E] uppercase font-semibold mb-1">
-                    Blockchain Transaction Hash (TXID) *
+                    Transaction Hash / TXID *
                   </label>
                   <input
                     type="text"
-                    placeholder="0x8f2d... or d9b7..."
+                    placeholder="Enter blockchain transaction hash (e.g. 0x8f2d...)"
                     value={formTxid}
                     onChange={(e) => setFormTxid(e.target.value)}
                     required
                     className="w-full px-4 py-2.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
                   />
+                </div>
+
+                {/* Optional Upload Proof of Transfer */}
+                <div>
+                  <label className="block text-[10px] text-[#8B949E] uppercase font-semibold mb-1">
+                    Upload Proof of Transfer (Optional Screenshot)
+                  </label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  {!proofImageBase64 ? (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full p-3 rounded-2xl recessed-well border border-dashed border-[#2C3547] hover:border-[#F5A623]/50 text-xs text-[#8B949E] hover:text-[#F0F6FC] flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4 text-[#F5A623]" />
+                      <span>Attach transfer confirmation screenshot</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 rounded-2xl recessed-well border border-[#238636]/40">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={proofImageBase64}
+                          alt="Proof preview"
+                          className="w-10 h-10 object-cover rounded-lg border border-[#21262D]"
+                        />
+                        <div className="text-xs text-[#238636] font-medium flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span>Proof Attached</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProofImageBase64(null);
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                        className="text-xs text-red-400 hover:underline cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -354,7 +440,7 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Early mobile validator node pledge"
+                    placeholder="e.g. Validator allocation deposit"
                     value={formNote}
                     onChange={(e) => setFormNote(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] text-xs focus:outline-none focus:border-[#F5A623]"
@@ -365,10 +451,10 @@ export const PresaleDepositModal: React.FC<PresaleDepositModalProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting || !isChainEnabled}
-                  className="btn-gold-capsule w-full py-4 px-6 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="btn-gold-capsule w-full py-4 px-6 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 font-bold"
                 >
                   {isSubmitting ? (
-                    <span>BROADCASTING TO PROTOCOL QUEUE...</span>
+                    <span>QUEUING TRANSACTION FOR VALIDATOR VERIFICATION...</span>
                   ) : (
                     <>
                       <span>SUBMIT TRANSACTION FOR ON-CHAIN APPROVAL</span>

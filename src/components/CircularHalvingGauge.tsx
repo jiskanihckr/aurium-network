@@ -26,7 +26,7 @@ export const CircularHalvingGauge: React.FC<CircularHalvingGaugeProps> = ({
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const minutes = Math.floor((diff % (1000 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
       setTimeLeft({ days, hours, minutes, seconds });
@@ -51,13 +51,13 @@ export const CircularHalvingGauge: React.FC<CircularHalvingGaugeProps> = ({
 
   return (
     <div className={`w-full flex items-center justify-center select-none ${className}`}>
-      {/* Comfortable Ring Proportions: w-64 h-64 sm:w-72 sm:h-72 mx-auto relative */}
-      <div className="w-64 h-64 sm:w-72 sm:h-72 mx-auto relative flex items-center justify-center">
+      {/* Responsive Ring Proportions: max diameter ~216px on mobile so numbers never wrap awkwardly */}
+      <div className="w-[216px] h-[216px] sm:w-64 sm:h-64 md:w-72 md:h-72 mx-auto relative flex items-center justify-center shrink-0">
         {/* Outer Ambient Glow Halo */}
-        <div className="absolute w-56 h-56 sm:w-64 sm:h-64 rounded-full bg-[#F5A623]/15 blur-2xl pointer-events-none" />
+        <div className="absolute w-44 h-44 sm:w-56 sm:h-56 md:w-64 md:h-64 rounded-full bg-[#F5A623]/15 blur-2xl pointer-events-none" />
 
         {/* Inner Recessed Well Backdrop */}
-        <div className="w-[196px] h-[196px] sm:w-[220px] sm:h-[220px] rounded-full recessed-well border border-[#21262D] absolute pointer-events-none shadow-inner" />
+        <div className="w-[164px] h-[164px] sm:w-[196px] sm:h-[196px] md:w-[220px] md:h-[220px] rounded-full recessed-well border border-[#21262D] absolute pointer-events-none shadow-inner" />
 
         {/* SVG Orbital Metallic Rings & Glowing Arcs */}
         <svg
@@ -159,22 +159,22 @@ export const CircularHalvingGauge: React.FC<CircularHalvingGaugeProps> = ({
           />
         </svg>
 
-        {/* 1. Inner Circle Layout Structure: Full flex column centered vertically and horizontally */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 z-10 pointer-events-none">
-          {/* A) Top Label */}
-          <span className="text-[11px] sm:text-xs font-semibold tracking-[0.2em] text-[#8B949E] uppercase mb-2">
+        {/* Inner Circle Layout Structure */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2 sm:p-4 z-10 pointer-events-none">
+          {/* Top Label */}
+          <span className="text-[10px] sm:text-xs font-semibold tracking-[0.16em] sm:tracking-[0.2em] text-[#8B949E] uppercase mb-1 sm:mb-2">
             NEXT HALVING
           </span>
 
-          {/* B) Central Countdown */}
-          <div className="font-mono text-xl sm:text-2xl font-black text-[#F5A623] tracking-tight sm:tracking-wide drop-shadow-[0_0_12px_rgba(245,166,35,0.4)] my-1 whitespace-nowrap">
+          {/* Central Countdown: fits mobile perfectly without wrapping */}
+          <div className="font-mono text-base sm:text-xl md:text-2xl font-black text-[#F5A623] tracking-tight sm:tracking-wide drop-shadow-[0_0_12px_rgba(245,166,35,0.4)] my-0.5 sm:my-1 whitespace-nowrap">
             {formattedCountdown}
           </div>
 
-          {/* C) Bottom Date */}
-          <div className="text-[11px] text-[#8B949E] mt-2 flex flex-col items-center leading-tight">
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Estimated Date</span>
-            <span className="text-zinc-300 font-medium mt-0.5">{targetDateFormatted}</span>
+          {/* Bottom Date */}
+          <div className="text-[10px] sm:text-[11px] text-[#8B949E] mt-1 sm:mt-2 flex flex-col items-center leading-tight">
+            <span className="text-[9px] sm:text-[10px] text-zinc-500 uppercase tracking-wider">Estimated Date</span>
+            <span className="text-zinc-300 font-medium mt-0.5 text-[10px] sm:text-[11px]">{targetDateFormatted}</span>
           </div>
         </div>
       </div>

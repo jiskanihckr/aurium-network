@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { AuriumState, TxidDeposit } from './src/types';
+import { AuriumState, TxidDeposit, PresaleRoundId } from './src/types';
 import { defaultAuriumState } from './src/data/initialState';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,7 +28,8 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
 
-  app.use(express.json());
+  // Support proof screenshot uploads
+  app.use(express.json({ limit: '12mb' }));
 
   // Real-time SSE Stream
   app.get('/api/realtime/stream', (req: Request, res: Response) => {
@@ -65,6 +66,44 @@ async function startServer() {
     res.json({ success: true, state });
   });
 
+  // Dedicated 3-Round Presale Management Endpoint
+  app.post('/api/admin/presale-config', (req: Request, res: Response) => {
+    const { activeRoundId, status, notificationBanner, rounds, minDepositUsdt, enabled } = req.body;
+
+    if (enabled !== undefined) {
+      state.presale.enabled = Boolean(enabled);
+    }
+
+    if (status) {
+      state.presale.status = status;
+    }
+
+    if (notificationBanner !== undefined) {
+      state.presale.notificationBanner = notificationBanner;
+    }
+
+    if (minDepositUsdt !== undefined) {
+      state.presale.minDepositUsdt = Number(minDepositUsdt);
+    }
+
+    if (rounds) {
+      state.presale.rounds = { ...state.presale.rounds, ...rounds };
+    }
+
+    if (activeRoundId && state.presale.rounds[activeRoundId as PresaleRoundId]) {
+      state.presale.activeRoundId = activeRoundId as PresaleRoundId;
+      const roundData = state.presale.rounds[activeRoundId as PresaleRoundId];
+      state.presale.round = roundData.shortName;
+      state.presale.rateUsdtPerAuri = roundData.priceUsdt;
+      state.presale.totalAllocation = roundData.totalAllocation;
+      state.presale.raisedUsdt = roundData.raisedUsdt;
+      state.presale.progressPercent = roundData.progressPercent;
+    }
+
+    broadcastState('PRESALE_CONFIG_UPDATED');
+    res.json({ success: true, state });
+  });
+
   // Update Deposit Addresses
   app.post('/api/admin/addresses', (req: Request, res: Response) => {
     const { bep20, trc20, erc20 } = req.body;
@@ -88,9 +127,21 @@ async function startServer() {
     res.json({ success: true, state });
   });
 
-  // Trigger Halving (50% Cut) or Update Halving Date
+  // Halving Engine Manual Overrides & Trigger
   app.post('/api/admin/halving', (req: Request, res: Response) => {
-    const { action, nextHalvingDate } = req.body;
+    const { action, nextHalvingDate, baseDailyYield, currentEra } = req.body;
+
+    if (baseDailyYield !== undefined) {
+      state.network.baseDailyYield = Number(baseDailyYield);
+    }
+
+    if (currentEra !== undefined) {
+      state.halving.currentEra = Number(currentEra);
+    }
+
+    if (nextHalvingDate) {
+      state.halving.nextHalvingDate = nextHalvingDate;
+    }
 
     if (action === 'trigger_50') {
       const prevYield = state.network.baseDailyYield;
@@ -100,9 +151,11 @@ async function startServer() {
       state.halving.totalHalvingsTriggered += 1;
       state.network.blockHeight += 12840;
 
-      // Reset countdown to default 30 days ahead
-      const nextDate = new Date(Date.now() + 30 * 24 * 3600 * 1000);
-      state.halving.nextHalvingDate = nextDate.toISOString();
+      // Reset countdown to default 30 days ahead unless explicit date given
+      if (!nextHalvingDate) {
+        const nextDate = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+        state.halving.nextHalvingDate = nextDate.toISOString();
+      }
 
       state.halving.halvingHistory.unshift({
         id: `halv-${Date.now()}`,
@@ -111,8 +164,6 @@ async function startServer() {
         newYield: newYield,
         blockHeight: state.network.blockHeight,
       });
-    } else if (nextHalvingDate) {
-      state.halving.nextHalvingDate = nextHalvingDate;
     }
 
     broadcastState('HALVING_UPDATED');
@@ -130,9 +181,17 @@ async function startServer() {
     if (action === 'approve') {
       item.status = 'approved';
       if (note) item.note = note;
-      // Also increment raised amount and active nodes slightly
+      // Increment active round raised and total
       state.presale.raisedUsdt += item.amountUsdt;
       state.network.activeNodes += Math.floor(item.amountUsdt / 10);
+
+      const activeId = state.presale.activeRoundId;
+      if (state.presale.rounds && state.presale.rounds[activeId]) {
+        const r = state.presale.rounds[activeId];
+        r.raisedUsdt += item.amountUsdt;
+        r.progressPercent = Math.min(100, Number(((r.raisedUsdt / r.targetCapUsdt) * 100).toFixed(1)));
+        state.presale.progressPercent = r.progressPercent;
+      }
     } else if (action === 'reject') {
       item.status = 'rejected';
       if (note) item.note = note;
@@ -142,12 +201,14 @@ async function startServer() {
     res.json({ success: true, state });
   });
 
-  // Public user submits a TXID
+  // Public user submits a TXID with optional proof screenshot
   app.post('/api/user/submit-txid', (req: Request, res: Response) => {
-    const { userWallet, network, amountUsdt, txid, note } = req.body;
+    const { userWallet, network, amountUsdt, txid, note, proofImageBase64, round } = req.body;
     if (!userWallet || !network || !amountUsdt || !txid) {
       return res.status(400).json({ error: 'Missing required deposit fields' });
     }
+
+    const currentRound = round || state.presale.round || 'Round 1';
 
     const newTxid: TxidDeposit = {
       id: `tx-${Date.now()}`,
@@ -157,7 +218,9 @@ async function startServer() {
       txid: txid.trim(),
       timestamp: new Date().toISOString(),
       status: 'pending',
-      note: note || 'Public presale portal submission',
+      note: note || `Presale ${currentRound} portal submission`,
+      proofImageBase64: proofImageBase64 || undefined,
+      round: currentRound,
     };
 
     state.txids.unshift(newTxid);

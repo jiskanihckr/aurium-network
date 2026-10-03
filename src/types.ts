@@ -1,5 +1,20 @@
 export type NetworkChain = 'BEP-20' | 'TRC-20' | 'ERC-20';
 
+export type PresaleRoundId = 'round_1' | 'round_2' | 'round_3';
+
+export interface PresaleRoundConfig {
+  id: PresaleRoundId;
+  name: string;
+  shortName: string;
+  badgeLabel: string;
+  priceUsdt: number;
+  totalAllocation: number;
+  targetCapUsdt: number;
+  raisedUsdt: number;
+  progressPercent: number;
+  status: 'active' | 'upcoming' | 'completed' | 'paused';
+}
+
 export interface TxidDeposit {
   id: string;
   userWallet: string;
@@ -9,6 +24,8 @@ export interface TxidDeposit {
   timestamp: string;
   status: 'pending' | 'approved' | 'rejected';
   note?: string;
+  proofImageBase64?: string;
+  round?: string;
 }
 
 export interface HalvingRecord {
@@ -38,7 +55,12 @@ export interface AuriumState {
   };
   presale: {
     enabled: boolean;
-    round: 'Round 1' | 'Round 2';
+    activeRoundId: PresaleRoundId;
+    status: 'active' | 'paused' | 'coming_soon';
+    notificationBanner?: string;
+    rounds: Record<PresaleRoundId, PresaleRoundConfig>;
+    // Main active round projection:
+    round: string;
     progressPercent: number;
     totalAllocation: number;
     raisedUsdt: number;

@@ -5,6 +5,7 @@ interface AuriumLogoProps {
   showText?: boolean;
   className?: string;
   glow?: boolean;
+  compactOnMobile?: boolean;
 }
 
 export const AuriumLogo: React.FC<AuriumLogoProps> = ({
@@ -12,6 +13,7 @@ export const AuriumLogo: React.FC<AuriumLogoProps> = ({
   showText = true,
   className = '',
   glow = true,
+  compactOnMobile = false,
 }) => {
   const dimensions = {
     sm: {
@@ -20,7 +22,7 @@ export const AuriumLogo: React.FC<AuriumLogoProps> = ({
       subClass: 'text-[8px] sm:text-[9px] tracking-[0.25em]',
     },
     md: {
-      icon: 32,
+      icon: 30,
       textClass: 'text-xs sm:text-sm lg:text-base tracking-[0.16em] sm:tracking-[0.24em]',
       subClass: 'text-[8px] sm:text-[9px] tracking-[0.25em]',
     },
@@ -37,7 +39,7 @@ export const AuriumLogo: React.FC<AuriumLogoProps> = ({
   }[size];
 
   return (
-    <div className={`flex items-center gap-2.5 sm:gap-3.5 select-none shrink-0 ${className}`}>
+    <div className={`flex items-center gap-2 sm:gap-3.5 select-none shrink-0 ${className}`}>
       {/* Metallic Shield Crest */}
       <div className="relative shrink-0 flex items-center justify-center">
         {/* Ambient Gold Back-Glow */}
@@ -165,13 +167,15 @@ export const AuriumLogo: React.FC<AuriumLogoProps> = ({
       {showText && (
         <div className="flex flex-col whitespace-nowrap min-w-0">
           <span
-            className={`font-black uppercase text-[#F0F6FC] font-sans ${dimensions.textClass} flex items-center gap-1 leading-tight`}
+            className={`font-black uppercase text-[#F0F6FC] font-sans ${dimensions.textClass} flex items-center leading-tight`}
           >
             <span>AURIUM</span>
-            <span className="text-[#F5A623] font-bold">NETWORK</span>
+            <span className={`${compactOnMobile ? 'hidden md:inline' : 'inline'} text-[#F5A623] font-bold ml-1.5`}>
+              NETWORK
+            </span>
           </span>
           <span
-            className={`hidden sm:block uppercase text-[#8B949E] font-medium ${dimensions.subClass} leading-tight mt-0.5`}
+            className={`${compactOnMobile ? 'hidden md:block' : 'hidden sm:block'} uppercase text-[#8B949E] font-medium ${dimensions.subClass} leading-tight mt-0.5`}
           >
             Decentralized Mobile Consensus
           </span>

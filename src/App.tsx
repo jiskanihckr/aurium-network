@@ -13,7 +13,8 @@ import { RoadmapSection } from './components/RoadmapSection';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { SupabaseAuthModal } from './components/SupabaseAuthModal';
-import { MobileAppContainer } from './components/MobileAppContainer';
+import { NotFoundPage } from './components/NotFoundPage';
+import { ParticleNetworkCanvas } from './components/ParticleNetworkCanvas';
 import { Footer } from './components/Footer';
 
 export default function App() {
@@ -22,9 +23,11 @@ export default function App() {
     isConnected,
     lastSyncTime,
     updateToggles,
+    updatePresaleConfig,
     updateAddresses,
     updateApk,
     triggerHalvingCut,
+    updateHalvingParams,
     updateHalvingDate,
     handleTxidAction,
     submitDepositTxid,
@@ -33,27 +36,30 @@ export default function App() {
 
   const auth = useSupabaseAuth();
 
-  const [activeView, setActiveView] = useState<'public' | 'admin' | 'app'>('public');
+  const [activeView, setActiveView] = useState<'public' | 'admin' | '404'>('public');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isApkModalOpen, setIsApkModalOpen] = useState<boolean>(false);
   const [isPresaleModalOpen, setIsPresaleModalOpen] = useState<boolean>(false);
 
-  // Check URL pathname and query params for /admin or ?view=admin or ?view=app routing
+  // Check URL pathname and query params for secret vault gateway or 404 cloaking
   useEffect(() => {
     const handleLocation = () => {
       const path = window.location.pathname;
       const search = window.location.search;
 
-      if (path.includes('/admin') || search.includes('view=admin')) {
+      // Secret Admin Portal Access: ONLY opens when visiting with ?gate=aurium_vault_9x72
+      if (search.includes('gate=aurium_vault_9x72')) {
         if (!isAdminAuthenticated) {
           setIsLoginModalOpen(true);
         } else {
           setActiveView('admin');
         }
-      } else if (search.includes('view=app') || path.includes('/app')) {
-        setActiveView('app');
+      } else if (path.includes('/admin')) {
+        // /admin Route Cloaking: MUST immediately render standard "404 - This page doesn't exist" screen
+        setActiveView('404');
+        setIsLoginModalOpen(false);
       } else {
         setActiveView('public');
       }
@@ -68,21 +74,6 @@ export default function App() {
     setIsAdminAuthenticated(true);
     setIsLoginModalOpen(false);
     setActiveView('admin');
-    window.history.pushState({}, '', '/admin');
-  };
-
-  const handleOpenAdmin = () => {
-    if (!isAdminAuthenticated) {
-      setIsLoginModalOpen(true);
-    } else {
-      setActiveView('admin');
-      window.history.pushState({}, '', '/admin');
-    }
-  };
-
-  const handleLaunchApp = () => {
-    setActiveView('app');
-    window.history.pushState({}, '', '/?view=app');
   };
 
   const handleBackToPublic = () => {
@@ -91,14 +82,15 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#090C10] text-[#F0F6FC] selection:bg-[#F5A623]/30 selection:text-[#F5A623]">
-      {/* Header with Launch App, Admin Quick Switcher, & Supabase Auth integration */}
+    <div className="min-h-screen bg-[#090C10] text-[#F0F6FC] selection:bg-[#F5A623]/30 selection:text-[#F5A623] relative">
+      {/* GPU-Accelerated Animated Dark-Luxury DePIN Particle Canvas */}
+      <ParticleNetworkCanvas />
+
+      {/* Header with Direct APK Download & Supabase/Web3 Auth */}
       <Header
         state={state}
         onOpenApkModal={() => setIsApkModalOpen(true)}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        onLaunchApp={handleLaunchApp}
-        onOpenAdmin={handleOpenAdmin}
         auth={auth}
         activeView={activeView}
         setActiveView={handleBackToPublic}
@@ -106,14 +98,16 @@ export default function App() {
       />
 
       {/* Main View Switcher */}
-      {activeView === 'admin' ? (
+      {activeView === 'admin' && isAdminAuthenticated ? (
         <AdminPanel
           state={state}
           onBackToPublic={handleBackToPublic}
           updateToggles={updateToggles}
+          updatePresaleConfig={updatePresaleConfig}
           updateAddresses={updateAddresses}
           updateApk={updateApk}
           triggerHalvingCut={triggerHalvingCut}
+          updateHalvingParams={updateHalvingParams}
           updateHalvingDate={updateHalvingDate}
           handleTxidAction={handleTxidAction}
           submitDepositTxid={submitDepositTxid}
@@ -121,15 +115,10 @@ export default function App() {
           isConnected={isConnected}
           lastSyncTime={lastSyncTime}
         />
-      ) : activeView === 'app' ? (
-        <MobileAppContainer
-          state={state}
-          onBackToLanding={handleBackToPublic}
-          onOpenPresaleModal={() => setIsPresaleModalOpen(true)}
-          auth={auth}
-        />
+      ) : activeView === '404' ? (
+        <NotFoundPage onBackToHome={handleBackToPublic} />
       ) : (
-        <main>
+        <main className="relative z-10">
           {/* Hero Section */}
           <HeroSection
             state={state}
@@ -138,9 +127,9 @@ export default function App() {
           />
 
           {/* Core Interactive Triad Section with Generous Breathing Room */}
-          <section className="py-6 sm:py-12 relative z-10">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+          <section className="py-4 sm:py-10 relative z-10 w-full max-w-full overflow-hidden">
+            <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 {/* 1. Live Node Status Card */}
                 <LiveNodeStatusCard
                   state={state}
@@ -169,11 +158,10 @@ export default function App() {
           {/* Expanded Luxury Roadmap (Milestone Suspense Timeline) */}
           <RoadmapSection />
 
-          {/* Footer with Developer Admin Portal trigger */}
+          {/* Footer without any visible admin hints */}
           <Footer
             state={state}
             onOpenApkModal={() => setIsApkModalOpen(true)}
-            onOpenAdmin={handleOpenAdmin}
           />
         </main>
       )}
@@ -199,16 +187,12 @@ export default function App() {
         auth={auth}
       />
 
-      {/* Protected Admin Access Modal triggered by direct /admin path */}
+      {/* Secret Vault Protected Admin Login Modal (only accessed via ?gate=aurium_vault_9x72) */}
       <AdminLoginModal
         isOpen={isLoginModalOpen}
         onClose={() => {
           setIsLoginModalOpen(false);
-          if (activeView === 'admin') {
-            handleBackToPublic();
-          } else {
-            window.history.pushState({}, '', '/');
-          }
+          handleBackToPublic();
         }}
         onSuccess={handleAdminLoginSuccess}
       />

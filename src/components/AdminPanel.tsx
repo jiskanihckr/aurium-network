@@ -9,22 +9,51 @@ import {
   Copy,
   Check,
   RefreshCw,
-  PlusCircle,
   AlertTriangle,
   ArrowLeft,
   Flame,
   Layers,
+  Coins,
+  Clock,
+  FileText,
+  Upload,
+  Image as ImageIcon,
+  CheckCheck,
+  XCircle,
+  Eye,
+  Sliders,
+  DollarSign,
+  Radio,
 } from 'lucide-react';
-import { AuriumState, NetworkChain, PartialAuriumState } from '../types';
+import {
+  AuriumState,
+  NetworkChain,
+  PartialAuriumState,
+  PresaleRoundId,
+  PresaleRoundConfig,
+} from '../types';
 import { AuriumLogo } from './AuriumLogo';
 
 interface AdminPanelProps {
   state: AuriumState;
   onBackToPublic: () => void;
   updateToggles: (partial: PartialAuriumState) => Promise<void>;
+  updatePresaleConfig: (config: {
+    activeRoundId?: PresaleRoundId;
+    status?: 'active' | 'paused' | 'coming_soon';
+    notificationBanner?: string;
+    rounds?: Record<PresaleRoundId, PresaleRoundConfig>;
+    minDepositUsdt?: number;
+    enabled?: boolean;
+  }) => Promise<void>;
   updateAddresses: (addresses: { bep20?: string; trc20?: string; erc20?: string }) => Promise<void>;
   updateApk: (apkData: Partial<AuriumState['apk']>) => Promise<void>;
   triggerHalvingCut: () => Promise<void>;
+  updateHalvingParams: (params: {
+    baseDailyYield?: number;
+    currentEra?: number;
+    nextHalvingDate?: string;
+  }) => Promise<void>;
   updateHalvingDate: (dateIso: string) => Promise<void>;
   handleTxidAction: (id: string, action: 'approve' | 'reject', note?: string) => Promise<void>;
   submitDepositTxid: (data: {
@@ -33,6 +62,8 @@ interface AdminPanelProps {
     amountUsdt: number;
     txid: string;
     note?: string;
+    proofImageBase64?: string;
+    round?: string;
   }) => Promise<void>;
   resetToDefaults: () => Promise<void>;
   isConnected: boolean;
@@ -43,27 +74,73 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   state,
   onBackToPublic,
   updateToggles,
+  updatePresaleConfig,
   updateAddresses,
   updateApk,
   triggerHalvingCut,
-  updateHalvingDate,
+  updateHalvingParams,
   handleTxidAction,
-  submitDepositTxid,
   resetToDefaults,
   isConnected,
+  lastSyncTime,
 }) => {
-  const [bep20Address, setBep20Address] = useState(state.depositAddresses.bep20);
-  const [trc20Address, setTrc20Address] = useState(state.depositAddresses.trc20);
-  const [erc20Address, setErc20Address] = useState(state.depositAddresses.erc20);
-  const [addressSaved, setAddressSaved] = useState(false);
+  // Navigation tabs
+  const [activeTab, setActiveTab] = useState<'presale' | 'queue' | 'halving' | 'toggles' | 'wallets'>('presale');
 
-  const [apkVersion, setApkVersion] = useState(state.apk.version);
-  const [apkUrl, setApkUrl] = useState(state.apk.downloadUrl);
-  const [apkSize, setApkSize] = useState(state.apk.fileSize);
-  const [apkSha256, setApkSha256] = useState(state.apk.sha256);
-  const [apkSaved, setApkSaved] = useState(false);
+  // --- Presale Management State ---
+  const [activeRoundId, setActiveRoundId] = useState<PresaleRoundId>(state.presale.activeRoundId || 'round_1');
+  const [presaleStatus, setPresaleStatus] = useState<'active' | 'paused' | 'coming_soon'>(state.presale.status || 'active');
+  const [notificationBanner, setNotificationBanner] = useState<string>(
+    state.presale.notificationBanner || 'Round 1 Active: Allocation 75% subscribed. Seed tier unlocks validator privileges.'
+  );
+  const [minDepositInput, setMinDepositInput] = useState<string>(String(state.presale.minDepositUsdt));
 
-  const [halvingDateInput, setHalvingDateInput] = useState(() => {
+  // Local round configurations initialized from state
+  const initialRounds = state.presale.rounds || {
+    round_1: {
+      id: 'round_1',
+      name: 'Round 1 (Seed / Early Validator)',
+      shortName: 'Round 1',
+      badgeLabel: 'SEED / EARLY VALIDATOR',
+      priceUsdt: 0.05,
+      totalAllocation: 10000000,
+      targetCapUsdt: 500000,
+      raisedUsdt: 375000,
+      progressPercent: 75,
+      status: 'active',
+    },
+    round_2: {
+      id: 'round_2',
+      name: 'Round 2 (Strategic Private)',
+      shortName: 'Round 2',
+      badgeLabel: 'STRATEGIC PRIVATE',
+      priceUsdt: 0.08,
+      totalAllocation: 15000000,
+      targetCapUsdt: 1200000,
+      raisedUsdt: 0,
+      progressPercent: 0,
+      status: 'upcoming',
+    },
+    round_3: {
+      id: 'round_3',
+      name: 'Round 3 (Public Pre-Listing)',
+      shortName: 'Round 3',
+      badgeLabel: 'PUBLIC PRE-LISTING',
+      priceUsdt: 0.12,
+      totalAllocation: 25000000,
+      targetCapUsdt: 3000000,
+      raisedUsdt: 0,
+      progressPercent: 0,
+      status: 'upcoming',
+    },
+  };
+
+  const [roundsConfig, setRoundsConfig] = useState<Record<PresaleRoundId, PresaleRoundConfig>>(initialRounds);
+
+  // --- Halving Overrides State ---
+  const [baseYieldInput, setBaseYieldInput] = useState<string>(String(state.network.baseDailyYield));
+  const [currentEraInput, setCurrentEraInput] = useState<string>(String(state.halving.currentEra));
+  const [halvingDateInput, setHalvingDateInput] = useState<string>(() => {
     try {
       const d = new Date(state.halving.nextHalvingDate);
       return d.toISOString().slice(0, 16);
@@ -71,13 +148,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return '';
     }
   });
-
-  const [minWithdrawalInput, setMinWithdrawalInput] = useState(String(state.withdrawals.minWithdrawalAuri));
-  const [txidFilter, setTxidFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
-  const [copiedTxid, setCopiedTxid] = useState<string | null>(null);
+  const [showHalvingConfirmModal, setShowHalvingConfirmModal] = useState(false);
   const [isHalvingLoading, setIsHalvingLoading] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // --- Wallet Addresses & APK State ---
+  const [bep20Address, setBep20Address] = useState(state.depositAddresses.bep20);
+  const [trc20Address, setTrc20Address] = useState(state.depositAddresses.trc20);
+  const [erc20Address, setErc20Address] = useState(state.depositAddresses.erc20);
+  const [apkVersion, setApkVersion] = useState(state.apk.version);
+  const [apkUrl, setApkUrl] = useState(state.apk.downloadUrl);
+  const [apkSize, setApkSize] = useState(state.apk.fileSize);
+  const [apkSha256, setApkSha256] = useState(state.apk.sha256);
+
+  // --- TXID Queue State ---
+  const [txidFilter, setTxidFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [previewProofImage, setPreviewProofImage] = useState<string | null>(null);
+  const [copiedTxid, setCopiedTxid] = useState<string | null>(null);
+
+  // Toast notification
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -89,6 +178,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setCopiedTxid(null), 2000);
   };
 
+  // Save 3-Round Presale Settings
+  const handleSavePresaleConfig = async () => {
+    await updatePresaleConfig({
+      activeRoundId,
+      status: presaleStatus,
+      notificationBanner,
+      minDepositUsdt: Number(minDepositInput) || 50,
+      rounds: roundsConfig,
+    });
+    showToast('Presale configuration and multi-round rates synchronized!');
+  };
+
+  // Save Manual Halving & Emission Overrides
+  const handleSaveHalvingOverrides = async () => {
+    const yieldNum = Number(baseYieldInput);
+    const eraNum = Number(currentEraInput);
+    const isoDate = halvingDateInput ? new Date(halvingDateInput).toISOString() : undefined;
+
+    await updateHalvingParams({
+      baseDailyYield: isNaN(yieldNum) ? undefined : yieldNum,
+      currentEra: isNaN(eraNum) ? undefined : eraNum,
+      nextHalvingDate: isoDate,
+    });
+    showToast('Manual halving timelock and emission rates updated!');
+  };
+
+  // Execute Instant Halving Override
+  const handleExecuteInstantHalving = async () => {
+    setIsHalvingLoading(true);
+    await triggerHalvingCut();
+    setIsHalvingLoading(false);
+    setShowHalvingConfirmModal(false);
+    showToast('Instant halving executed! Base emission halved and Era advanced.');
+  };
+
+  // Save Addresses
   const handleSaveAddresses = async (e: React.FormEvent) => {
     e.preventDefault();
     await updateAddresses({
@@ -96,11 +221,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       trc20: trc20Address,
       erc20: erc20Address,
     });
-    setAddressSaved(true);
-    showToast('Addresses updated and synchronized with live clients!');
-    setTimeout(() => setAddressSaved(false), 2500);
+    showToast('Deposit addresses updated across network!');
   };
 
+  // Save APK
   const handleSaveApk = async (e: React.FormEvent) => {
     e.preventDefault();
     await updateApk({
@@ -109,810 +233,962 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       fileSize: apkSize,
       sha256: apkSha256,
     });
-    setApkSaved(true);
-    showToast(`APK release ${apkVersion} updated on landing page!`);
-    setTimeout(() => setApkSaved(false), 2500);
+    showToast('APK release information updated!');
   };
 
-  const handleTriggerHalving = async () => {
-    const confirmCut = window.confirm(
-      `Confirm triggering emission halving? This will immediately reduce base daily yield from ${state.network.baseDailyYield} to ${(state.network.baseDailyYield / 2).toFixed(2)} AURI/day across all active nodes.`
-    );
-    if (!confirmCut) return;
-
-    setIsHalvingLoading(true);
-    await triggerHalvingCut();
-    setIsHalvingLoading(false);
-    showToast('Emission Halving executed! Base daily yield reduced by 50%.');
-  };
-
-  const handleUpdateHalvingDate = async () => {
-    if (!halvingDateInput) return;
-    const isoDate = new Date(halvingDateInput).toISOString();
-    await updateHalvingDate(isoDate);
-    showToast('Halving countdown target date updated!');
-  };
-
-  const handleSimulateDeposit = async () => {
-    const randomChains: NetworkChain[] = ['BEP-20', 'TRC-20', 'ERC-20'];
-    const selected = randomChains[Math.floor(Math.random() * randomChains.length)];
-    const randomAmount = [100, 250, 500, 1000, 2500][Math.floor(Math.random() * 5)];
-    const randomHex = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-
-    await submitDepositTxid({
-      userWallet: `0x${randomHex.substring(0, 4)}...${randomHex.substring(60)}`,
-      network: selected,
-      amountUsdt: randomAmount,
-      txid: `0x${randomHex}`,
-      note: 'Simulated node validator pledge',
-    });
-    showToast('Simulated incoming TXID added to queue!');
-  };
-
+  // Filtered TXIDs
   const filteredTxids = state.txids.filter((item) => {
     if (txidFilter === 'all') return true;
     return item.status === txidFilter;
   });
 
-  const pendingCount = state.txids.filter((t) => t.status === 'pending').length;
-  const approvedCount = state.txids.filter((t) => t.status === 'approved').length;
-  const totalVolume = state.txids
-    .filter((t) => t.status === 'approved')
-    .reduce((acc, curr) => acc + curr.amountUsdt, 0);
-
   return (
-    <div className="min-h-screen bg-[#090C10] text-[#F0F6FC] pb-24">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 relative z-10 animate-fade-in">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 aurium-card text-[#F0F6FC] px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-[#F5A623]">
-          <CheckCircle className="w-5 h-5 text-[#F5A623]" />
-          <span className="text-xs font-bold uppercase tracking-wider">{toastMessage}</span>
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-[#090C10] border border-[#F5A623] text-[#F0F6FC] text-xs font-semibold shadow-2xl flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-[#238636] shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Admin Top Navigation Bar */}
-      <div className="bg-[#0D121A]/95 border-b border-[#1F2736] sticky top-0 z-30 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onBackToPublic}
-              className="btn-dark-capsule px-4 py-2 text-xs flex items-center gap-2 cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Public View</span>
-            </button>
-
-            <div className="h-4 w-px bg-[#2C3547] hidden sm:block" />
-
-            <AuriumLogo size="sm" showText={true} />
+      {/* Top Protocol Header Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 mb-8 border-b border-[#1F2736]">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl recessed-well border border-[#21262D] flex items-center justify-center text-[#F5A623] shrink-0">
+            <Shield className="w-6 h-6 text-[#F5A623] drop-shadow-[0_0_10px_rgba(245,166,35,0.7)]" />
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-xs text-[#8B949E] font-mono recessed-well px-3 py-1.5 rounded-full border border-[#1F2736]">
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[#238636] animate-pulse' : 'bg-amber-500'}`} />
-              <span className="hidden sm:inline">{isConnected ? 'LIVE SSE ACTIVE' : 'OFFLINE'}</span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-[#F5A623] font-bold">
+                ENCRYPTED PROTOCOL CONSOLE
+              </span>
+              <span className="w-2 h-2 rounded-full bg-[#238636] animate-pulse" />
             </div>
-
-            <button
-              onClick={resetToDefaults}
-              title="Reset state to protocol initial defaults"
-              className="btn-dark-capsule px-3 py-1.5 text-xs text-[#8B949E] hover:text-red-400 flex items-center gap-1.5 cursor-pointer"
-            >
-              <RefreshCw className="w-3 h-3" />
-              <span className="hidden md:inline">Reset Defaults</span>
-            </button>
+            <h1 className="text-xl sm:text-2xl font-black text-[#F0F6FC] font-sans tracking-tight">
+              Aurium Network Master Governance
+            </h1>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <div className="px-3.5 py-1.5 rounded-full recessed-well border border-[#21262D] text-[11px] font-mono text-[#8B949E] hidden lg:flex items-center gap-2">
+            <span>SYNC: {lastSyncTime.toLocaleTimeString()}</span>
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[#238636]' : 'bg-amber-400 animate-pulse'}`} />
+          </div>
+
+          <button
+            onClick={resetToDefaults}
+            className="btn-dark-capsule px-3.5 py-2 text-xs flex items-center gap-1.5 cursor-pointer text-[#8B949E] hover:text-[#F0F6FC]"
+            title="Reset simulation state to genesis defaults"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-[#F5A623]" />
+            <span className="hidden sm:inline">RESET STATE</span>
+          </button>
+
+          <button
+            onClick={onBackToPublic}
+            className="btn-gold-capsule px-4 py-2 text-xs flex items-center gap-1.5 cursor-pointer font-bold"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-[#070A0E]" />
+            <span>EXIT ADMIN</span>
+          </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        {/* Killswitch Alert Banner if Network is paused */}
-        {!state.network.isOnline && (
-          <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/50 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
-              <div>
-                <div className="text-sm font-bold text-red-200">
-                  CRITICAL: Node Network Master Kill-Switch is ACTIVE
-                </div>
-                <div className="text-xs text-red-300">
-                  Consensus sync is suspended on the public landing page. Mobile nodes will see maintenance mode.
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => updateToggles({ network: { isOnline: true } })}
-              className="btn-gold-capsule px-5 py-2 text-xs uppercase tracking-wider shrink-0 cursor-pointer"
-            >
-              Resume Network
-            </button>
-          </div>
-        )}
+      {/* Primary Navigation Tabs */}
+      <div className="flex flex-wrap gap-2 mb-8 p-1.5 recessed-well rounded-2xl border border-[#21262D]">
+        <button
+          onClick={() => setActiveTab('presale')}
+          className={`flex-1 min-w-[140px] py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'presale' ? 'btn-gold-capsule' : 'text-[#8B949E] hover:text-[#F0F6FC]'
+          }`}
+        >
+          <Coins className="w-4 h-4" />
+          <span>Presale Management</span>
+        </button>
 
-        {/* 1. MASTER FEATURE TOGGLES */}
-        <section className="aurium-card rounded-3xl p-6 sm:p-8">
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#1F2736]">
-            <div>
-              <h2 className="text-lg font-black text-[#F0F6FC] font-sans flex items-center gap-2">
-                <Power className="w-5 h-5 text-[#F5A623]" />
-                <span>Master Protocol Feature Toggles</span>
-              </h2>
-              <p className="text-xs text-[#8B949E] mt-0.5">
-                Instant kill-switches and subsystem controllers synced live to all landing page users.
-              </p>
-            </div>
-            <span className="text-[11px] font-mono text-[#8B949E] recessed-well px-3 py-1 rounded-full border border-[#1F2736]">
-              5 Subsystems
+        <button
+          onClick={() => setActiveTab('queue')}
+          className={`flex-1 min-w-[140px] py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'queue' ? 'btn-gold-capsule' : 'text-[#8B949E] hover:text-[#F0F6FC]'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>TXID Review Queue</span>
+          {state.txids.filter((t) => t.status === 'pending').length > 0 && (
+            <span className="w-5 h-5 rounded-full bg-amber-500 text-black text-[10px] font-black flex items-center justify-center">
+              {state.txids.filter((t) => t.status === 'pending').length}
             </span>
-          </div>
+          )}
+        </button>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {/* Toggle 1: Node Network Status */}
-            <div className="recessed-well rounded-2xl p-5 border border-[#1F2736] flex flex-col justify-between">
+        <button
+          onClick={() => setActiveTab('halving')}
+          className={`flex-1 min-w-[140px] py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'halving' ? 'btn-gold-capsule' : 'text-[#8B949E] hover:text-[#F0F6FC]'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Halving & Emissions</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('toggles')}
+          className={`flex-1 min-w-[140px] py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'toggles' ? 'btn-gold-capsule' : 'text-[#8B949E] hover:text-[#F0F6FC]'
+          }`}
+        >
+          <Power className="w-4 h-4" />
+          <span>Master Toggles</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('wallets')}
+          className={`flex-1 min-w-[140px] py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'wallets' ? 'btn-gold-capsule' : 'text-[#8B949E] hover:text-[#F0F6FC]'
+          }`}
+        >
+          <Wallet className="w-4 h-4" />
+          <span>Wallets & APK</span>
+        </button>
+      </div>
+
+      {/* ========================================================= */}
+      {/* TAB 1: 3-ROUND STRATEGIC PRESALE SYSTEM MANAGEMENT         */}
+      {/* ========================================================= */}
+      {activeTab === 'presale' && (
+        <div className="space-y-6">
+          {/* Active Round Switcher & Global Status Banner */}
+          <div className="aurium-card rounded-3xl p-6 sm:p-8 border border-[#21262D] space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#1F2736]">
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-[#8B949E] uppercase tracking-wider">
-                    Node Network Status
-                  </span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${state.network.isOnline ? 'bg-[#238636]/15 text-[#238636] border border-[#238636]/40' : 'bg-red-500/15 text-red-400 border border-red-500/40'}`}>
-                    {state.network.isOnline ? 'ONLINE' : 'KILLED'}
-                  </span>
-                </div>
-                <div className="text-sm font-bold text-[#F0F6FC] mb-1">Consensus Engine Kill-Switch</div>
-                <p className="text-xs text-[#8B949E] mb-4">
-                  Controls global block validation. When flipped off, nodes stop syncing and hero displays maintenance.
+                <h2 className="text-lg font-bold text-[#F0F6FC] flex items-center gap-2">
+                  <Coins className="w-5 h-5 text-[#F5A623]" />
+                  <span>3-Round Presale Control Matrix</span>
+                </h2>
+                <p className="text-xs text-[#8B949E] mt-0.5">
+                  Configure price per round, target hard-caps, token allocations, and active round switchers.
                 </p>
               </div>
-              <button
-                onClick={() => updateToggles({ network: { isOnline: !state.network.isOnline } })}
-                className={`w-full py-2.5 px-4 rounded-full text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  state.network.isOnline
-                    ? 'btn-dark-capsule hover:border-red-500 hover:text-red-400'
-                    : 'btn-gold-capsule'
-                }`}
-              >
-                <Power className="w-3.5 h-3.5" />
-                <span>{state.network.isOnline ? 'Kill Network' : 'Resume Network'}</span>
-              </button>
-            </div>
 
-            {/* Toggle 2: Presale Status & Round Selector */}
-            <div className="recessed-well rounded-2xl p-5 border border-[#1F2736] flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-[#8B949E] uppercase tracking-wider">
-                    Presale Status
-                  </span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${state.presale.enabled ? 'bg-[#238636]/15 text-[#238636] border border-[#238636]/40' : 'bg-red-500/15 text-red-400 border border-red-500/40'}`}>
-                    {state.presale.enabled ? state.presale.round : 'PAUSED'}
-                  </span>
-                </div>
-                <div className="text-sm font-bold text-[#F0F6FC] mb-2">Presale Allocation Portal</div>
-
-                <div className="flex items-center gap-2 mb-3">
-                  <button
-                    onClick={() => updateToggles({ presale: { round: 'Round 1' } })}
-                    className={`flex-1 py-1.5 px-2 rounded-full text-xs font-semibold cursor-pointer ${
-                      state.presale.round === 'Round 1'
-                        ? 'btn-gold-capsule text-[11px]'
-                        : 'btn-dark-capsule text-[11px]'
-                    }`}
-                  >
-                    Round 1 ($0.05)
-                  </button>
-                  <button
-                    onClick={() => updateToggles({ presale: { round: 'Round 2' } })}
-                    className={`flex-1 py-1.5 px-2 rounded-full text-xs font-semibold cursor-pointer ${
-                      state.presale.round === 'Round 2'
-                        ? 'btn-gold-capsule text-[11px]'
-                        : 'btn-dark-capsule text-[11px]'
-                    }`}
-                  >
-                    Round 2 ($0.08)
-                  </button>
-                </div>
-
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs text-[#8B949E] mb-1">
-                    <span>Progress:</span>
-                    <span className="font-mono text-[#F5A623] font-bold">{state.presale.progressPercent}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="10"
-                    max="100"
-                    value={state.presale.progressPercent}
-                    onChange={(e) => updateToggles({ presale: { progressPercent: Number(e.target.value) } })}
-                    className="w-full h-1.5 bg-[#1F2736] rounded appearance-none cursor-pointer accent-[#F5A623]"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={() => updateToggles({ presale: { enabled: !state.presale.enabled } })}
-                className="btn-dark-capsule w-full py-2.5 px-4 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>{state.presale.enabled ? 'Pause Presale' : 'Enable Presale'}</span>
-              </button>
-            </div>
-
-            {/* Toggle 3: Withdrawals Status */}
-            <div className="recessed-well rounded-2xl p-5 border border-[#1F2736] flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-[#8B949E] uppercase tracking-wider">
-                    Withdrawals Status
-                  </span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${state.withdrawals.enabled ? 'bg-[#238636]/15 text-[#238636] border border-[#238636]/40' : 'bg-red-500/15 text-red-400 border border-red-500/40'}`}>
-                    {state.withdrawals.enabled ? 'OPEN' : 'PAUSED'}
-                  </span>
-                </div>
-                <div className="text-sm font-bold text-[#F0F6FC] mb-1">AURI Withdrawal Gateway</div>
-                <p className="text-xs text-[#8B949E] mb-3">
-                  Allows node validators to withdraw mined tokens to external non-custodial wallets.
-                </p>
-
-                <div className="mb-4">
-                  <label className="text-[10px] text-[#8B949E] uppercase font-bold block mb-1">Min. Withdrawal (AURI)</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      value={minWithdrawalInput}
-                      onChange={(e) => setMinWithdrawalInput(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-full bg-[#090C10] border border-[#2C3547] text-xs font-mono text-[#F0F6FC]"
-                    />
-                    <button
-                      onClick={() => updateToggles({ withdrawals: { minWithdrawalAuri: Number(minWithdrawalInput) } })}
-                      className="btn-gold-capsule px-4 py-1.5 text-xs uppercase tracking-wider cursor-pointer"
-                    >
-                      Set
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => updateToggles({ withdrawals: { enabled: !state.withdrawals.enabled } })}
-                className="btn-dark-capsule w-full py-2.5 px-4 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>{state.withdrawals.enabled ? 'Pause Withdrawals' : 'Open Withdrawals'}</span>
-              </button>
-            </div>
-
-            {/* Toggle 4: Deposits Sub-Toggles */}
-            <div className="recessed-well rounded-2xl p-5 border border-[#1F2736] md:col-span-2">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-[#8B949E] uppercase tracking-wider">
-                  Deposit Sub-Networks
-                </span>
-                <button
-                  onClick={() => updateToggles({ deposits: { enabled: !state.deposits.enabled } })}
-                  className={`px-3 py-1 rounded-full text-xs font-bold uppercase cursor-pointer ${
-                    state.deposits.enabled
-                      ? 'btn-gold-capsule text-[11px]'
-                      : 'bg-red-500/20 text-red-300 border border-red-500/40'
+              {/* Status Indicator */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#8B949E] uppercase font-semibold">Gateway Status:</span>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-bold uppercase font-mono ${
+                    presaleStatus === 'active'
+                      ? 'bg-[#238636]/15 text-[#238636] border border-[#238636]/40'
+                      : presaleStatus === 'coming_soon'
+                      ? 'bg-amber-500/15 text-amber-400 border border-amber-500/40'
+                      : 'bg-red-500/15 text-red-400 border border-red-500/40'
                   }`}
                 >
-                  Master Deposits: {state.deposits.enabled ? 'Enabled' : 'Disabled'}
-                </button>
-              </div>
-              <div className="text-sm font-bold text-[#F0F6FC] mb-3">Individual Chain Toggles</div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-2xl bg-[#090C10] border border-[#1F2736] flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-[#F0F6FC]">BNB Chain (BEP-20)</div>
-                    <div className="text-[10px] text-[#8B949E]">BSC USDT Deposits</div>
-                  </div>
-                  <button
-                    onClick={() =>
-                      updateToggles({
-                        deposits: {
-                          chains: {
-                            ...state.deposits.chains,
-                            bep20: !state.deposits.chains.bep20,
-                          },
-                        },
-                      })
-                    }
-                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                      state.deposits.chains.bep20 ? 'bg-[#238636] text-white' : 'bg-[#1F2736] text-[#8B949E]'
-                    }`}
-                  >
-                    <Power className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-[#090C10] border border-[#1F2736] flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-[#F0F6FC]">TRON (TRC-20)</div>
-                    <div className="text-[10px] text-[#8B949E]">Tron USDT Deposits</div>
-                  </div>
-                  <button
-                    onClick={() =>
-                      updateToggles({
-                        deposits: {
-                          chains: {
-                            ...state.deposits.chains,
-                            trc20: !state.deposits.chains.trc20,
-                          },
-                        },
-                      })
-                    }
-                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                      state.deposits.chains.trc20 ? 'bg-[#238636] text-white' : 'bg-[#1F2736] text-[#8B949E]'
-                    }`}
-                  >
-                    <Power className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-[#090C10] border border-[#1F2736] flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-[#F0F6FC]">Ethereum (ERC-20)</div>
-                    <div className="text-[10px] text-[#8B949E]">ETH USDT Deposits</div>
-                  </div>
-                  <button
-                    onClick={() =>
-                      updateToggles({
-                        deposits: {
-                          chains: {
-                            ...state.deposits.chains,
-                            erc20: !state.deposits.chains.erc20,
-                          },
-                        },
-                      })
-                    }
-                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
-                      state.deposits.chains.erc20 ? 'bg-[#238636] text-white' : 'bg-[#1F2736] text-[#8B949E]'
-                    }`}
-                  >
-                    <Power className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                  {presaleStatus}
+                </span>
               </div>
             </div>
 
-            {/* Toggle 5: P2P Internal Transfers */}
-            <div className="recessed-well rounded-2xl p-5 border border-[#1F2736] flex flex-col justify-between">
+            {/* Quick Action Matrix: Select Active Round & Global Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Active Round Selector */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-[#8B949E] uppercase tracking-wider">
-                    P2P Transfers
-                  </span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${state.p2pTransfers.enabled ? 'bg-[#238636]/15 text-[#238636] border border-[#238636]/40' : 'bg-red-500/15 text-red-400 border border-red-500/40'}`}>
-                    {state.p2pTransfers.enabled ? 'ACTIVE' : 'DISABLED'}
-                  </span>
-                </div>
-                <div className="text-sm font-bold text-[#F0F6FC] mb-1">Internal Off-Chain Relay</div>
-                <p className="text-xs text-[#8B949E] mb-4">
-                  Controls peer-to-peer fast token transfers between light validator mobile nodes.
-                </p>
-              </div>
-              <button
-                onClick={() => updateToggles({ p2pTransfers: { enabled: !state.p2pTransfers.enabled } })}
-                className="btn-dark-capsule w-full py-2.5 px-4 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>{state.p2pTransfers.enabled ? 'Disable P2P Relay' : 'Enable P2P Relay'}</span>
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* 2. HALVING CONTROLLER & TRIGGER */}
-        <section className="aurium-card rounded-3xl p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#1F2736]">
-            <div>
-              <h2 className="text-lg font-black text-[#F0F6FC] font-sans flex items-center gap-2">
-                <Scissors className="w-5 h-5 text-[#F5A623]" />
-                <span>Emission Halving Controller</span>
-              </h2>
-              <p className="text-xs text-[#8B949E] mt-0.5">
-                Adjust scheduled countdown targets or execute an instant 50% reward cut across the global mobile network.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="px-3.5 py-1.5 rounded-full recessed-well border border-[#1F2736] text-xs font-mono text-[#F5A623]">
-                Era {state.halving.currentEra}
-              </div>
-              <div className="px-3.5 py-1.5 rounded-full recessed-well border border-[#1F2736] text-xs font-mono text-[#58A6FF]">
-                +{state.network.baseDailyYield} AURI/d
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-            {/* Halving Execution Action Card */}
-            <div className="recessed-well rounded-2xl p-5 border border-[#1F2736] space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-[#8B949E] font-bold">Programmatic Halving</span>
-                <span className="text-xs text-[#F5A623] font-mono font-bold">50% Cut</span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#090C10] border border-[#1F2736] flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] uppercase text-[#8B949E]">Current Base:</div>
-                  <div className="text-xl font-mono font-black text-[#F0F6FC]">+{state.network.baseDailyYield} AURI/d</div>
-                </div>
-                <div className="text-2xl font-bold text-[#F5A623]">→</div>
-                <div className="text-right">
-                  <div className="text-[10px] uppercase text-[#F5A623] font-bold">Post-Halving:</div>
-                  <div className="text-xl font-mono font-black text-[#F5A623] gold-glow-text">
-                    +{(state.network.baseDailyYield / 2).toFixed(4)} AURI/d
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleTriggerHalving}
-                disabled={isHalvingLoading}
-                className="btn-gold-capsule w-full py-3.5 px-6 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Flame className="w-4 h-4 text-[#070A0E]" />
-                <span>TRIGGER HALVING (50% CUT)</span>
-              </button>
-
-              <div className="text-[11px] text-[#8B949E] text-center">
-                Halving immediately updates the circular orbital gauge and public yield cards.
-              </div>
-            </div>
-
-            {/* Countdown Target Date Controller */}
-            <div className="recessed-well rounded-2xl p-5 border border-[#1F2736] space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-[#8B949E] font-bold">Countdown Target Timestamp</span>
-                <span className="text-xs text-[#58A6FF] font-mono">Live Sync</span>
-              </div>
-
-              <div>
-                <label className="block text-[10px] text-[#8B949E] uppercase font-bold mb-1.5">
-                  Select Next Halving Target Date & Time (UTC)
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8B949E] mb-2">
+                  Active Round Switcher
                 </label>
-                <input
-                  type="datetime-local"
-                  value={halvingDateInput}
-                  onChange={(e) => setHalvingDateInput(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-full bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
-                />
+                <div className="grid grid-cols-3 gap-2">
+                  {(['round_1', 'round_2', 'round_3'] as PresaleRoundId[]).map((rId) => {
+                    const r = roundsConfig[rId];
+                    const isSelected = activeRoundId === rId;
+                    return (
+                      <button
+                        key={rId}
+                        type="button"
+                        onClick={() => setActiveRoundId(rId)}
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'recessed-well border-[#F5A623] bg-[#F5A623]/10 shadow-[0_0_15px_rgba(245,166,35,0.15)]'
+                            : 'recessed-well border-[#21262D] hover:border-[#2C3547]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className={`font-bold ${isSelected ? 'text-[#F5A623]' : 'text-[#F0F6FC]'}`}>
+                            {r.shortName}
+                          </span>
+                          {isSelected && <span className="w-2 h-2 rounded-full bg-[#F5A623] animate-pulse" />}
+                        </div>
+                        <div className="text-[11px] font-mono text-[#58A6FF]">${r.priceUsdt} / AURI</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <button
-                onClick={handleUpdateHalvingDate}
-                className="btn-dark-capsule w-full py-2.5 px-4 text-xs uppercase tracking-wider cursor-pointer"
-              >
-                Update Countdown Timer on Landing Page
-              </button>
+              {/* Presale Status Override */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8B949E] mb-2">
+                  Presale Status Toggle
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPresaleStatus('active')}
+                    className={`py-3 px-3 rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      presaleStatus === 'active'
+                        ? 'bg-[#238636]/20 text-[#238636] border-[#238636]'
+                        : 'recessed-well border-[#21262D] text-[#8B949E]'
+                    }`}
+                  >
+                    <span>ACTIVE</span>
+                  </button>
 
-              {/* Halving History Log preview */}
-              <div className="pt-2 border-t border-[#1F2736]">
-                <div className="text-[10px] font-bold text-[#8B949E] uppercase mb-2">Halving Execution Log:</div>
-                <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1">
-                  {state.halving.halvingHistory.map((h) => (
-                    <div key={h.id} className="text-[11px] font-mono flex items-center justify-between text-[#8B949E] bg-[#090C10] p-2 rounded-xl border border-[#1F2736]">
-                      <span>Block #{h.blockHeight.toLocaleString()}</span>
-                      <span className="text-[#F0F6FC]">{h.previousYield} → {h.newYield} AURI</span>
-                      <span className="text-[10px] text-[#8B949E]">{new Date(h.timestamp).toLocaleDateString()}</span>
-                    </div>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPresaleStatus('coming_soon')}
+                    className={`py-3 px-3 rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      presaleStatus === 'coming_soon'
+                        ? 'bg-amber-500/20 text-amber-400 border-amber-500'
+                        : 'recessed-well border-[#21262D] text-[#8B949E]'
+                    }`}
+                  >
+                    <span>COMING SOON</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPresaleStatus('paused')}
+                    className={`py-3 px-3 rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      presaleStatus === 'paused'
+                        ? 'bg-red-500/20 text-red-400 border-red-500'
+                        : 'recessed-well border-[#21262D] text-[#8B949E]'
+                    }`}
+                  >
+                    <span>PAUSED</span>
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
 
-        {/* 3. DEPOSIT ADDRESS MANAGER */}
-        <section className="aurium-card rounded-3xl p-6 sm:p-8">
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#1F2736]">
+            {/* Notification Banner Customizer */}
             <div>
-              <h2 className="text-lg font-black text-[#F0F6FC] font-sans flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-[#F5A623]" />
-                <span>Deposit Address Manager</span>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#8B949E] mb-2">
+                Active Notification Banner (Displayed above presale progress)
+              </label>
+              <input
+                type="text"
+                value={notificationBanner}
+                onChange={(e) => setNotificationBanner(e.target.value)}
+                placeholder="e.g. Round 2 starts soon — Stay tuned for announcements"
+                className="w-full px-4 py-3 rounded-2xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] text-xs font-medium focus:outline-none focus:border-[#F5A623]"
+              />
+            </div>
+          </div>
+
+          {/* Individual Round Parameters: Round 1, Round 2, Round 3 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {(['round_1', 'round_2', 'round_3'] as PresaleRoundId[]).map((rId) => {
+              const r = roundsConfig[rId];
+              const isCurrent = activeRoundId === rId;
+
+              return (
+                <div
+                  key={rId}
+                  className={`aurium-card rounded-3xl p-5 sm:p-6 border relative transition-all ${
+                    isCurrent ? 'border-[#F5A623]/60 shadow-[0_0_20px_rgba(245,166,35,0.1)]' : 'border-[#21262D]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                        {r.badgeLabel}
+                      </div>
+                      <h3 className="text-base font-bold text-[#F0F6FC]">{r.name}</h3>
+                    </div>
+                    {isCurrent && (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#F5A623]/20 text-[#F5A623] border border-[#F5A623]/40 font-mono">
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider text-[#8B949E] font-semibold mb-1">
+                        Token Price (USDT / AURI)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-2.5 text-xs text-[#8B949E]">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={r.priceUsdt}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setRoundsConfig((prev) => ({
+                              ...prev,
+                              [rId]: { ...prev[rId], priceUsdt: val },
+                            }));
+                          }}
+                          className="w-full pl-8 pr-4 py-2 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider text-[#8B949E] font-semibold mb-1">
+                        Total Allocation (AURI)
+                      </label>
+                      <input
+                        type="number"
+                        step="100000"
+                        value={r.totalAllocation}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setRoundsConfig((prev) => ({
+                            ...prev,
+                            [rId]: { ...prev[rId], totalAllocation: val },
+                          }));
+                        }}
+                        className="w-full px-3.5 py-2 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider text-[#8B949E] font-semibold mb-1">
+                        Target Cap (USDT)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-2.5 text-xs text-[#8B949E]">$</span>
+                        <input
+                          type="number"
+                          step="10000"
+                          value={r.targetCapUsdt}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setRoundsConfig((prev) => ({
+                              ...prev,
+                              [rId]: { ...prev[rId], targetCapUsdt: val },
+                            }));
+                          }}
+                          className="w-full pl-8 pr-4 py-2 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] uppercase tracking-wider text-[#8B949E] font-semibold mb-1">
+                        Round Status
+                      </label>
+                      <select
+                        value={r.status}
+                        onChange={(e) => {
+                          const val = e.target.value as PresaleRoundConfig['status'];
+                          setRoundsConfig((prev) => ({
+                            ...prev,
+                            [rId]: { ...prev[rId], status: val },
+                          }));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] text-xs focus:outline-none focus:border-[#F5A623]"
+                      >
+                        <option value="active">Active</option>
+                        <option value="upcoming">Upcoming</option>
+                        <option value="completed">Completed</option>
+                        <option value="paused">Paused</option>
+                      </select>
+                    </div>
+
+                    <div className="p-3 rounded-xl recessed-well text-[11px] space-y-1 font-mono">
+                      <div className="flex justify-between text-[#8B949E]">
+                        <span>Raised:</span>
+                        <span className="text-[#F0F6FC]">${r.raisedUsdt.toLocaleString()} USDT</span>
+                      </div>
+                      <div className="flex justify-between text-[#8B949E]">
+                        <span>Progress:</span>
+                        <span className="text-[#F5A623]">{r.progressPercent}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Save All Presale Settings Bar */}
+          <div className="flex justify-end pt-4">
+            <button
+              onClick={handleSavePresaleConfig}
+              className="btn-gold-capsule px-8 py-3.5 text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer font-bold shadow-lg"
+            >
+              <Check className="w-4 h-4 text-[#070A0E]" />
+              <span>SAVE & BROADCAST PRESALE CONFIGURATION</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 2: TRANSACTION REVIEW QUEUE (WITH PROOF SCREENSHOTS) */}
+      {/* ========================================================= */}
+      {activeTab === 'queue' && (
+        <div className="aurium-card rounded-3xl p-6 sm:p-8 border border-[#21262D] space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#1F2736]">
+            <div>
+              <h2 className="text-lg font-bold text-[#F0F6FC] flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#F5A623]" />
+                <span>Transaction Review & Allocation Queue</span>
               </h2>
               <p className="text-xs text-[#8B949E] mt-0.5">
-                Update protocol receiving cold/hot storage addresses. Changes immediately reflect in the public Presale modal and QR code.
-              </p>
-            </div>
-            {addressSaved && (
-              <span className="text-xs text-[#238636] font-bold flex items-center gap-1">
-                <Check className="w-4 h-4" />
-                SAVED & SYNCED!
-              </span>
-            )}
-          </div>
-
-          <form onSubmit={handleSaveAddresses} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
-                BNB Smart Chain (BEP-20 USDT) Receiving Address *
-              </label>
-              <input
-                type="text"
-                value={bep20Address}
-                onChange={(e) => setBep20Address(e.target.value)}
-                required
-                className="w-full px-4 py-2.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
-                TRON (TRC-20 USDT) Receiving Address *
-              </label>
-              <input
-                type="text"
-                value={trc20Address}
-                onChange={(e) => setTrc20Address(e.target.value)}
-                required
-                className="w-full px-4 py-2.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
-                Ethereum (ERC-20 USDT) Receiving Address
-              </label>
-              <input
-                type="text"
-                value={erc20Address}
-                onChange={(e) => setErc20Address(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
-              />
-            </div>
-
-            <div className="pt-2 flex items-center justify-end">
-              <button
-                type="submit"
-                className="btn-gold-capsule py-2.5 px-6 text-xs uppercase tracking-wider cursor-pointer"
-              >
-                Save & Broadcast Addresses
-              </button>
-            </div>
-          </form>
-        </section>
-
-        {/* 4. TXID DEPOSIT VERIFICATION QUEUE */}
-        <section className="aurium-card rounded-3xl p-6 sm:p-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#1F2736]">
-            <div>
-              <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-[#F5A623]" />
-                <h2 className="text-lg font-black text-[#F0F6FC] font-sans">
-                  TXID Deposit Verification Queue
-                </h2>
-                {pendingCount > 0 && (
-                  <span className="px-3 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-                    {pendingCount} Pending
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-[#8B949E] mt-0.5">
-                Review and approve on-chain deposit pledges submitted by public presale participants.
+                Review submitted blockchain deposit hashes, inspect attached transfer screenshots, and credit AURI balances.
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleSimulateDeposit}
-                className="btn-dark-capsule px-4 py-2 text-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <PlusCircle className="w-3.5 h-3.5 text-[#58A6FF]" />
-                <span>Simulate Test Deposit</span>
-              </button>
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1.5 p-1 recessed-well rounded-xl border border-[#21262D]">
+              {(['all', 'pending', 'approved', 'rejected'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setTxidFilter(filter)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all cursor-pointer ${
+                    txidFilter === filter ? 'btn-gold-capsule' : 'text-[#8B949E] hover:text-[#F0F6FC]'
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Quick Metrics in Recessed Wells */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <div className="recessed-well p-3.5 rounded-2xl border border-[#1F2736]">
-              <div className="text-[10px] uppercase font-bold text-[#8B949E]">Approved Volume</div>
-              <div className="text-lg font-mono font-black text-[#238636]">${totalVolume.toLocaleString()} USDT</div>
+          {/* Queue Table */}
+          {filteredTxids.length === 0 ? (
+            <div className="p-12 text-center text-[#8B949E] text-xs">
+              No deposit records found in this category.
             </div>
-            <div className="recessed-well p-3.5 rounded-2xl border border-[#1F2736]">
-              <div className="text-[10px] uppercase font-bold text-[#8B949E]">Pending Verification</div>
-              <div className="text-lg font-mono font-black text-[#F5A623]">{pendingCount} Records</div>
-            </div>
-            <div className="recessed-well p-3.5 rounded-2xl border border-[#1F2736]">
-              <div className="text-[10px] uppercase font-bold text-[#8B949E]">Approved Pledges</div>
-              <div className="text-lg font-mono font-black text-[#F0F6FC]">{approvedCount} Records</div>
-            </div>
-            <div className="recessed-well p-3.5 rounded-2xl border border-[#1F2736]">
-              <div className="text-[10px] uppercase font-bold text-[#8B949E]">Total Submissions</div>
-              <div className="text-lg font-mono font-black text-[#8B949E]">{state.txids.length}</div>
-            </div>
-          </div>
-
-          {/* Filter Pills */}
-          <div className="flex items-center gap-2 mb-4">
-            {(['all', 'pending', 'approved', 'rejected'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setTxidFilter(tab)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  txidFilter === tab
-                    ? 'btn-gold-capsule text-[11px]'
-                    : 'text-[#8B949E] hover:text-[#F0F6FC]'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Table in Recessed Container */}
-          <div className="overflow-x-auto rounded-2xl border border-[#1F2736] bg-[#070A0E]">
-            <table className="w-full text-left text-xs text-[#8B949E]">
-              <thead className="bg-[#0E131A] text-[#F0F6FC] font-semibold border-b border-[#1F2736]">
-                <tr>
-                  <th className="p-3.5">User Wallet</th>
-                  <th className="p-3.5">Network</th>
-                  <th className="p-3.5">Amount (USDT)</th>
-                  <th className="p-3.5">TXID Hash</th>
-                  <th className="p-3.5">Timestamp</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5 text-right">Verification Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#1F2736]">
-                {filteredTxids.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-xs text-[#8B949E]">
-                      No deposit records in this category.
-                    </td>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#1F2736] text-[#8B949E] text-[10px] uppercase tracking-wider font-semibold">
+                    <th className="pb-3 px-3">Status</th>
+                    <th className="pb-3 px-3">Wallet / User</th>
+                    <th className="pb-3 px-3">Network & Round</th>
+                    <th className="pb-3 px-3">Amount</th>
+                    <th className="pb-3 px-3">TXID Hash</th>
+                    <th className="pb-3 px-3">Proof Screenshot</th>
+                    <th className="pb-3 px-3">Timestamp</th>
+                    <th className="pb-3 px-3 text-right">Actions</th>
                   </tr>
-                ) : (
-                  filteredTxids.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-[#131822]/60 transition-colors">
-                      <td className="p-3.5 font-mono font-bold text-[#F0F6FC]">{tx.userWallet}</td>
-                      <td className="p-3.5">
-                        <span className="px-2.5 py-0.5 rounded-full bg-[#131822] text-[#58A6FF] font-mono text-[11px] border border-[#2C3547]">
-                          {tx.network}
-                        </span>
-                      </td>
-                      <td className="p-3.5 font-mono font-black text-[#F5A623]">${tx.amountUsdt.toLocaleString()}</td>
-                      <td className="p-3.5 font-mono text-[11px]">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[#8B949E] truncate max-w-[130px]">{tx.txid}</span>
-                          <button
-                            onClick={() => handleCopy(tx.txid, tx.id)}
-                            className="text-[#8B949E] hover:text-[#F0F6FC] cursor-pointer"
-                          >
-                            {copiedTxid === tx.id ? <Check className="w-3 h-3 text-[#238636]" /> : <Copy className="w-3 h-3" />}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="p-3.5 text-[11px] text-[#8B949E]">
-                        {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="p-3.5">
+                </thead>
+                <tbody className="divide-y divide-[#1F2736]/60">
+                  {filteredTxids.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-[#12161A] transition-colors">
+                      <td className="py-3 px-3">
                         <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${
                             tx.status === 'approved'
-                              ? 'bg-[#238636]/15 text-[#238636] border-[#238636]/40'
-                              : tx.status === 'pending'
-                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/40 animate-pulse'
-                              : 'bg-red-500/15 text-red-400 border-red-500/40'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                              : tx.status === 'rejected'
+                              ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse'
                           }`}
                         >
                           {tx.status}
                         </span>
                       </td>
-                      <td className="p-3.5 text-right">
+
+                      <td className="py-3 px-3 font-mono font-medium text-[#F0F6FC]">{tx.userWallet}</td>
+
+                      <td className="py-3 px-3">
+                        <div className="font-mono text-[11px] text-[#58A6FF]">{tx.network}</div>
+                        <div className="text-[10px] text-[#8B949E]">{tx.round || 'Round 1'}</div>
+                      </td>
+
+                      <td className="py-3 px-3">
+                        <div className="font-mono font-bold text-[#F5A623]">${tx.amountUsdt} USDT</div>
+                        <div className="text-[10px] text-[#8B949E]">
+                          ~{Math.floor(tx.amountUsdt / state.presale.rateUsdtPerAuri).toLocaleString()} AURI
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-1 font-mono text-[11px] text-[#8B949E]">
+                          <span>{tx.txid.substring(0, 10)}...{tx.txid.substring(tx.txid.length - 6)}</span>
+                          <button
+                            onClick={() => handleCopy(tx.txid, tx.id)}
+                            className="p-1 hover:text-[#F0F6FC] cursor-pointer"
+                            title="Copy full TXID"
+                          >
+                            {copiedTxid === tx.id ? <Check className="w-3 h-3 text-[#238636]" /> : <Copy className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-3">
+                        {tx.proofImageBase64 ? (
+                          <button
+                            onClick={() => setPreviewProofImage(tx.proofImageBase64 || null)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#58A6FF]/10 text-[#58A6FF] hover:bg-[#58A6FF]/20 transition-colors text-[11px] cursor-pointer"
+                          >
+                            <ImageIcon className="w-3.5 h-3.5" />
+                            <span>View Proof</span>
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-gray-600 italic">No file attached</span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-3 font-mono text-[10px] text-[#8B949E]">
+                        {new Date(tx.timestamp).toLocaleString()}
+                      </td>
+
+                      <td className="py-3 px-3 text-right">
                         {tx.status === 'pending' ? (
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => handleTxidAction(tx.id, 'approve')}
-                              className="btn-gold-capsule px-3 py-1 text-[11px] uppercase tracking-wider cursor-pointer"
+                              onClick={() => handleTxidAction(tx.id, 'approve', 'Approved by administrator')}
+                              className="px-2.5 py-1 rounded-lg bg-[#238636] hover:bg-emerald-600 text-black font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
                             >
-                              Approve
+                              <CheckCheck className="w-3.5 h-3.5" />
+                              <span>Approve & Credit</span>
                             </button>
                             <button
-                              onClick={() => handleTxidAction(tx.id, 'reject', 'Manual rejection by admin')}
-                              className="px-3 py-1 rounded-full bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-300 font-bold text-[11px] uppercase transition-colors cursor-pointer"
+                              onClick={() => handleTxidAction(tx.id, 'reject', 'Rejected by administrator')}
+                              className="px-2.5 py-1 rounded-lg bg-red-950/60 text-red-300 border border-red-500/30 hover:bg-red-900/60 font-medium text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
                             >
-                              Reject
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>Reject</span>
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[11px] text-[#8B949E] italic">Settled</span>
+                          <span className="text-[11px] text-[#8B949E] capitalize font-mono">{tx.status}</span>
                         )}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* 5. APK VERSIONING & RELEASE CONTROL */}
-        <section className="aurium-card rounded-3xl p-6 sm:p-8">
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#1F2736]">
-            <div>
-              <h2 className="text-lg font-black text-[#F0F6FC] font-sans flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-[#F5A623]" />
-                <span>Direct APK Versioning & Release Controller</span>
-              </h2>
-              <p className="text-xs text-[#8B949E] mt-0.5">
-                Update the official downloadable Android release. Changes reflect instantly on the public landing page hero and download modal.
-              </p>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            {apkSaved && (
-              <span className="text-xs text-[#238636] font-bold flex items-center gap-1">
-                <Check className="w-4 h-4" />
-                RELEASE DEPLOYED!
-              </span>
-            )}
-          </div>
+          )}
+        </div>
+      )}
 
-          <form onSubmit={handleSaveApk} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
-                  Latest App Version *
-                </label>
-                <input
-                  type="text"
-                  value={apkVersion}
-                  onChange={(e) => setApkVersion(e.target.value)}
-                  placeholder="v1.0.2"
-                  required
-                  className="w-full px-4 py-2.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
-                />
+      {/* Proof Preview Modal */}
+      {previewProofImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl">
+          <div className="aurium-card rounded-3xl max-w-xl w-full p-6 border border-[#21262D] relative space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1F2736]">
+              <div className="text-sm font-bold text-[#F0F6FC] flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-[#F5A623]" />
+                <span>Deposit Transfer Verification Proof</span>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
-                  Package File Size *
-                </label>
-                <input
-                  type="text"
-                  value={apkSize}
-                  onChange={(e) => setApkSize(e.target.value)}
-                  placeholder="18.4 MB"
-                  required
-                  className="w-full px-4 py-2.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
-                Direct APK Download URL *
-              </label>
-              <input
-                type="text"
-                value={apkUrl}
-                onChange={(e) => setApkUrl(e.target.value)}
-                placeholder="https://cdn.aurium.network/builds/aurium-light-validator-v1.0.2.apk"
-                required
-                className="w-full px-4 py-2.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
-                Official SHA-256 Checksum Hash *
-              </label>
-              <input
-                type="text"
-                value={apkSha256}
-                onChange={(e) => setApkSha256(e.target.value)}
-                placeholder="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                required
-                className="w-full px-4 py-2.5 rounded-full bg-[#070A0E] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
-              />
-            </div>
-
-            <div className="pt-2 flex items-center justify-end">
               <button
-                type="submit"
-                className="btn-gold-capsule py-2.5 px-6 text-xs uppercase tracking-wider cursor-pointer"
+                onClick={() => setPreviewProofImage(null)}
+                className="w-8 h-8 rounded-full recessed-well flex items-center justify-center text-[#8B949E] hover:text-[#F0F6FC] cursor-pointer"
               >
-                Save & Deploy APK Update
+                ✕
               </button>
             </div>
-          </form>
-        </section>
-      </div>
+            <div className="rounded-2xl overflow-hidden border border-[#1F2736] max-h-[70vh] flex items-center justify-center bg-black">
+              <img src={previewProofImage} alt="Deposit Proof" className="max-h-[68vh] w-auto object-contain" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 3: MANUAL HALVING TIMELOCK & EMISSION CONTROL         */}
+      {/* ========================================================= */}
+      {activeTab === 'halving' && (
+        <div className="space-y-6">
+          <div className="aurium-card rounded-3xl p-6 sm:p-8 border border-[#21262D] space-y-6">
+            <div className="pb-5 border-b border-[#1F2736]">
+              <h2 className="text-lg font-bold text-[#F0F6FC] flex items-center gap-2">
+                <Flame className="w-5 h-5 text-[#F5A623]" />
+                <span>Manual Halving Timelock & Emission Engine</span>
+              </h2>
+              <p className="text-xs text-[#8B949E] mt-0.5">
+                Manually control the base daily emission rate, define the algorithmic Era, and adjust the target countdown timestamp.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* 1. Base Emission Rate Override */}
+              <div className="recessed-well rounded-2xl p-5 border border-[#21262D] space-y-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8B949E]">
+                  Base Daily Emission Yield
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.25"
+                    value={baseYieldInput}
+                    onChange={(e) => setBaseYieldInput(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F5A623] font-mono font-bold text-sm focus:outline-none focus:border-[#F5A623]"
+                  />
+                  <span className="absolute right-4 top-3 text-xs text-[#8B949E] font-sans">AURI/day</span>
+                </div>
+                <p className="text-[11px] text-[#8B949E]">
+                  Current live baseline: <strong>+{state.network.baseDailyYield} AURI/day</strong> per validator.
+                </p>
+              </div>
+
+              {/* 2. Halving Era Override */}
+              <div className="recessed-well rounded-2xl p-5 border border-[#21262D] space-y-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8B949E]">
+                  Halving Era Index
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={currentEraInput}
+                  onChange={(e) => setCurrentEraInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono font-bold text-sm focus:outline-none focus:border-[#F5A623]"
+                />
+                <p className="text-[11px] text-[#8B949E]">
+                  Active protocol epoch: <strong>Era {state.halving.currentEra}</strong>
+                </p>
+              </div>
+
+              {/* 3. Next Halving Target Timestamp */}
+              <div className="recessed-well rounded-2xl p-5 border border-[#21262D] space-y-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8B949E]">
+                  Next Halving Target Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={halvingDateInput}
+                  onChange={(e) => setHalvingDateInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                />
+                <p className="text-[11px] text-[#8B949E]">
+                  Directly controls the Circular Halving countdown gauge on the landing page.
+                </p>
+              </div>
+            </div>
+
+            {/* Save Manual Parameters Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#1F2736]">
+              <div className="text-xs text-[#8B949E]">
+                Total Halvings Triggered to Date: <span className="font-mono text-[#F0F6FC] font-bold">{state.halving.totalHalvingsTriggered}</span>
+              </div>
+              <button
+                onClick={handleSaveHalvingOverrides}
+                className="btn-gold-capsule px-6 py-3 text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer font-bold"
+              >
+                <Check className="w-4 h-4 text-[#070A0E]" />
+                <span>SAVE EMISSION OVERRIDES & TIMELOCK</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Emergency Instant Halving Cut Card */}
+          <div className="aurium-card rounded-3xl p-6 sm:p-8 border border-red-500/30 bg-red-950/10 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400">
+                <Scissors className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-red-200">Emergency Instant Halving Cut (-50%)</h3>
+                <p className="text-xs text-[#8B949E]">
+                  Instantly slices current yield ({state.network.baseDailyYield} → {(state.network.baseDailyYield / 2).toFixed(2)} AURI/d) and advances to Era {state.halving.currentEra + 1}.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setShowHalvingConfirmModal(true)}
+                className="px-6 py-3 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer shadow-lg shadow-red-950/50"
+              >
+                <Scissors className="w-4 h-4" />
+                <span>EXECUTE INSTANT HALVING</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instant Halving Confirmation Modal */}
+      {showHalvingConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl">
+          <div className="aurium-card rounded-3xl max-w-md w-full p-6 sm:p-8 border border-red-500/40 relative space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-black text-[#F0F6FC]">Confirm Instant Halving</h3>
+              <p className="text-xs text-[#8B949E] leading-relaxed">
+                Are you sure you want to execute an instant 50% halving cut? This will immediately reduce the base daily emission from{' '}
+                <strong className="text-[#F5A623]">+{state.network.baseDailyYield.toFixed(2)} AURI/d</strong> to{' '}
+                <strong className="text-[#F5A623]">+{ (state.network.baseDailyYield / 2).toFixed(2) } AURI/d</strong> and advance Era to{' '}
+                <strong className="text-[#F0F6FC]">Era {state.halving.currentEra + 1}</strong> across all connected validator nodes.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-3">
+              <button
+                onClick={() => setShowHalvingConfirmModal(false)}
+                className="btn-dark-capsule py-3 text-xs uppercase font-bold cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={handleExecuteInstantHalving}
+                disabled={isHalvingLoading}
+                className="py-3 rounded-full bg-red-600 hover:bg-red-500 text-white text-xs font-bold uppercase cursor-pointer"
+              >
+                {isHalvingLoading ? 'EXECUTING...' : 'CONFIRM & EXECUTE'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 4: MASTER KILL-SWITCHES & PROTOCOL TOGGLES            */}
+      {/* ========================================================= */}
+      {activeTab === 'toggles' && (
+        <div className="aurium-card rounded-3xl p-6 sm:p-8 border border-[#21262D] space-y-6">
+          <div className="pb-5 border-b border-[#1F2736]">
+            <h2 className="text-lg font-bold text-[#F0F6FC] flex items-center gap-2">
+              <Power className="w-5 h-5 text-[#F5A623]" />
+              <span>Master Protocol Kill-Switches</span>
+            </h2>
+            <p className="text-xs text-[#8B949E] mt-0.5">
+              Instantly toggle core consensus, deposit gates, presale portals, and withdrawal layers in real time.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* 1. Node Network Master Switch */}
+            <div className="recessed-well rounded-2xl p-5 border border-[#21262D] flex items-center justify-between">
+              <div>
+                <div className="text-sm font-bold text-[#F0F6FC]">Node Network Consensus</div>
+                <div className="text-xs text-[#8B949E] mt-0.5">
+                  Controls live block validation across all {state.network.activeNodes.toLocaleString()} nodes.
+                </div>
+              </div>
+              <button
+                onClick={() => updateToggles({ network: { isOnline: !state.network.isOnline } })}
+                className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${
+                  state.network.isOnline ? 'bg-[#238636]' : 'bg-[#1F2736]'
+                }`}
+              >
+                <span
+                  className={`w-6 h-6 rounded-full bg-white absolute top-1 transition-transform ${
+                    state.network.isOnline ? 'left-7' : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* 2. Presale Gateway */}
+            <div className="recessed-well rounded-2xl p-5 border border-[#21262D] flex items-center justify-between">
+              <div>
+                <div className="text-sm font-bold text-[#F0F6FC]">Strategic Presale Gateway</div>
+                <div className="text-xs text-[#8B949E] mt-0.5">
+                  Allows public participants to purchase presale allocation quotas.
+                </div>
+              </div>
+              <button
+                onClick={() => updateToggles({ presale: { enabled: !state.presale.enabled } })}
+                className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${
+                  state.presale.enabled ? 'bg-[#238636]' : 'bg-[#1F2736]'
+                }`}
+              >
+                <span
+                  className={`w-6 h-6 rounded-full bg-white absolute top-1 transition-transform ${
+                    state.presale.enabled ? 'left-7' : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* 3. Deposits Gateway */}
+            <div className="recessed-well rounded-2xl p-5 border border-[#21262D] flex items-center justify-between">
+              <div>
+                <div className="text-sm font-bold text-[#F0F6FC]">USDT Deposits Master Switch</div>
+                <div className="text-xs text-[#8B949E] mt-0.5">
+                  Enables/disables all incoming blockchain deposit listening.
+                </div>
+              </div>
+              <button
+                onClick={() => updateToggles({ deposits: { enabled: !state.deposits.enabled } })}
+                className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${
+                  state.deposits.enabled ? 'bg-[#238636]' : 'bg-[#1F2736]'
+                }`}
+              >
+                <span
+                  className={`w-6 h-6 rounded-full bg-white absolute top-1 transition-transform ${
+                    state.deposits.enabled ? 'left-7' : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* 4. Withdrawals Gateway */}
+            <div className="recessed-well rounded-2xl p-5 border border-[#21262D] flex items-center justify-between">
+              <div>
+                <div className="text-sm font-bold text-[#F0F6FC]">Node Earnings Withdrawals</div>
+                <div className="text-xs text-[#8B949E] mt-0.5">
+                  Governs outward payout processing for node validators.
+                </div>
+              </div>
+              <button
+                onClick={() => updateToggles({ withdrawals: { enabled: !state.withdrawals.enabled } })}
+                className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${
+                  state.withdrawals.enabled ? 'bg-[#238636]' : 'bg-[#1F2736]'
+                }`}
+              >
+                <span
+                  className={`w-6 h-6 rounded-full bg-white absolute top-1 transition-transform ${
+                    state.withdrawals.enabled ? 'left-7' : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 5: DEPOSIT ADDRESSES & SIGNED APK RELEASE             */}
+      {/* ========================================================= */}
+      {activeTab === 'wallets' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Wallet Address Configuration */}
+          <div className="aurium-card rounded-3xl p-6 sm:p-8 border border-[#21262D] space-y-5">
+            <div className="pb-4 border-b border-[#1F2736]">
+              <h3 className="text-base font-bold text-[#F0F6FC] flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-[#F5A623]" />
+                <span>Protocol Cold Receiving Addresses</span>
+              </h3>
+              <p className="text-xs text-[#8B949E] mt-0.5">
+                Official destination addresses shown on the public presale and deposit gateway.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveAddresses} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
+                  BEP-20 (BNB Smart Chain)
+                </label>
+                <input
+                  type="text"
+                  value={bep20Address}
+                  onChange={(e) => setBep20Address(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
+                  TRC-20 (TRON Network)
+                </label>
+                <input
+                  type="text"
+                  value={trc20Address}
+                  onChange={(e) => setTrc20Address(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
+                  ERC-20 (Ethereum Mainnet)
+                </label>
+                <input
+                  type="text"
+                  value={erc20Address}
+                  onChange={(e) => setErc20Address(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="btn-gold-capsule w-full py-3 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer font-bold"
+              >
+                <Check className="w-4 h-4 text-[#070A0E]" />
+                <span>SAVE RECEIVING ADDRESSES</span>
+              </button>
+            </form>
+          </div>
+
+          {/* Signed APK Build Management */}
+          <div className="aurium-card rounded-3xl p-6 sm:p-8 border border-[#21262D] space-y-5">
+            <div className="pb-4 border-b border-[#1F2736]">
+              <h3 className="text-base font-bold text-[#F0F6FC] flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-[#58A6FF]" />
+                <span>Signed Android APK Build Release</span>
+              </h3>
+              <p className="text-xs text-[#8B949E] mt-0.5">
+                Manage the live downloadable binary parameters and cryptographic checksum.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveApk} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
+                    Build Version
+                  </label>
+                  <input
+                    type="text"
+                    value={apkVersion}
+                    onChange={(e) => setApkVersion(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
+                    File Size
+                  </label>
+                  <input
+                    type="text"
+                    value={apkSize}
+                    onChange={(e) => setApkSize(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
+                  Direct Download URL
+                </label>
+                <input
+                  type="text"
+                  value={apkUrl}
+                  onChange={(e) => setApkUrl(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#8B949E] uppercase tracking-wider mb-1.5">
+                  SHA-256 Binary Checksum
+                </label>
+                <input
+                  type="text"
+                  value={apkSha256}
+                  onChange={(e) => setApkSha256(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#090C10] border border-[#2C3547] text-[#F0F6FC] font-mono text-xs focus:outline-none focus:border-[#F5A623]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="btn-gold-capsule w-full py-3 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer font-bold"
+              >
+                <Check className="w-4 h-4 text-[#070A0E]" />
+                <span>SAVE APK RELEASE SETTINGS</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

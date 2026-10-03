@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export interface AuriumUser {
   id: string;
@@ -10,9 +11,6 @@ export interface AuriumUser {
   nodeStatus: 'active' | 'syncing' | 'idle';
   token?: string;
 }
-
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 const STORAGE_KEY = 'aurium_auth_session';
 
@@ -39,26 +37,103 @@ export function useSupabaseAuth() {
     }
   }, [user]);
 
+  // Listen to Supabase Auth state changes (including OAuth redirects)
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const email = session.user.email || 'user@aurium.network';
+        const hash = Math.abs(
+          email.split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)
+        ).toString(16).padStart(8, '0');
+
+        setUser({
+          id: session.user.id,
+          email: session.user.email,
+          walletAddress: `0x${hash}948B...3F21`,
+          auriBalance: 1250.0,
+          usdtBalance: 320.0,
+          authProvider: 'supabase',
+          nodeStatus: 'active',
+          token: session.access_token,
+        });
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const email = session.user.email || 'user@aurium.network';
+        const hash = Math.abs(
+          email.split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)
+        ).toString(16).padStart(8, '0');
+
+        setUser({
+          id: session.user.id,
+          email: session.user.email,
+          walletAddress: `0x${hash}948B...3F21`,
+          auriBalance: 1250.0,
+          usdtBalance: 320.0,
+          authProvider: 'supabase',
+          nodeStatus: 'active',
+          token: session.access_token,
+        });
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const signInWithGoogle = async () => {
+    setIsLoading(true);
+    setAuthError(null);
+    try {
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+        if (error) throw error;
+      } else {
+        // High-fidelity instant demo Google OAuth simulation if Supabase env credentials are not yet configured
+        await new Promise((r) => setTimeout(r, 600));
+        const demoEmail = 'aurium.validator@gmail.com';
+        const hash = 'a9f24e10';
+        const newUser: AuriumUser = {
+          id: `google_${Date.now()}`,
+          email: demoEmail,
+          walletAddress: `0x${hash}948B...3F21`,
+          auriBalance: 1250.0,
+          usdtBalance: 320.0,
+          authProvider: 'supabase',
+          nodeStatus: 'active',
+        };
+        setUser(newUser);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Google sign in failed';
+      setAuthError(message);
+      setIsLoading(false);
+      throw err;
+    }
+    setIsLoading(false);
+  };
+
   const signInWithEmail = async (email: string, pass: string) => {
     setIsLoading(true);
     setAuthError(null);
 
-    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    if (isSupabaseConfigured) {
       try {
-        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ email, password: pass }),
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password: pass,
         });
-
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error_description || data.msg || data.message || 'Authentication failed');
-        }
+        if (error) throw error;
 
         const hash = Math.abs(
           email.split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)
@@ -72,7 +147,7 @@ export function useSupabaseAuth() {
           usdtBalance: 320.0,
           authProvider: 'supabase',
           nodeStatus: 'active',
-          token: data.access_token,
+          token: data.session?.access_token,
         };
         setUser(newUser);
       } catch (err: unknown) {
@@ -82,7 +157,6 @@ export function useSupabaseAuth() {
         throw err;
       }
     } else {
-      // Instant seamless local authorization with wallet generation
       await new Promise((r) => setTimeout(r, 600));
       const hash = Math.abs(
         email.split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)
@@ -107,35 +181,26 @@ export function useSupabaseAuth() {
     setIsLoading(true);
     setAuthError(null);
 
-    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    if (isSupabaseConfigured) {
       try {
-        const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ email, password: pass }),
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password: pass,
         });
-
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error_description || data.msg || data.message || 'Registration failed');
-        }
+        if (error) throw error;
 
         const randomHex = Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
         const formatted = `0x${randomHex.substring(0, 4)}...${randomHex.substring(36)}`;
 
         const newUser: AuriumUser = {
-          id: data.user?.id || data.id || `usr_${Date.now()}`,
+          id: data.user?.id || `usr_${Date.now()}`,
           email: data.user?.email || email,
           walletAddress: formatted,
           auriBalance: 25.5,
           usdtBalance: 0.0,
           authProvider: 'supabase',
           nodeStatus: 'active',
-          token: data.access_token,
+          token: data.session?.access_token,
         };
         setUser(newUser);
       } catch (err: unknown) {
@@ -209,15 +274,9 @@ export function useSupabaseAuth() {
   };
 
   const signOut = async () => {
-    if (SUPABASE_URL && SUPABASE_ANON_KEY && user?.token) {
+    if (isSupabaseConfigured) {
       try {
-        await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
-          method: 'POST',
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${user.token}`,
-          },
-        });
+        await supabase.auth.signOut();
       } catch {
         // ignore
       }
@@ -230,10 +289,11 @@ export function useSupabaseAuth() {
     isAuthenticated: !!user,
     isLoading,
     authError,
+    signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
     connectWallet,
     signOut,
-    isSupabaseConfigured: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY),
+    isSupabaseConfigured,
   };
 }
