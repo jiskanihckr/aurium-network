@@ -22,58 +22,49 @@ export const PresaleCard: React.FC<PresaleCardProps> = ({ state, onOpenPresaleMo
       <div className="absolute top-0 left-1/3 w-60 h-60 bg-[#F5A623]/10 blur-[100px] pointer-events-none rounded-full" />
 
       <div>
-        {/* Header Line */}
-        <div className="flex items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl recessed-well border border-[#21262D] flex items-center justify-center text-[#F5A623] shrink-0">
-              <Coins className="w-5 h-5 drop-shadow-[0_0_8px_rgba(245,166,35,0.6)]" />
+        {/* Header Row: Strict flex container with padding and zero overflow */}
+        <div className="flex items-center justify-between gap-2 px-1 mb-4 w-full">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl recessed-well border border-[#21262D] flex items-center justify-center text-[#F5A623] shrink-0">
+              <Coins className="w-4 h-4 sm:w-5 sm:h-5 drop-shadow-[0_0_8px_rgba(245,166,35,0.6)]" />
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] text-[#8B949E] font-semibold">
-                TOKEN ALLOCATION
-              </div>
-              <h3 className="text-lg sm:text-xl font-extrabold text-[#F0F6FC] font-sans">
-                Strategic Presale
-              </h3>
+              <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">TOKEN ALLOCATION</p>
+              <h3 className="text-lg font-bold text-[#F5A623] tracking-tight">Strategic Presale</h3>
             </div>
           </div>
-
-          <div className="flex items-center">
-            <span
-              className={`px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold uppercase tracking-wider ${
-                isPresaleActive
-                  ? 'bg-[#238636]/15 text-[#238636] border border-[#238636]/40'
-                  : 'bg-red-500/15 text-red-400 border border-red-500/40'
-              }`}
-            >
-              {isPresaleActive ? `${state.presale.round} ACTIVE` : 'PAUSED'}
-            </span>
-          </div>
+          <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+            {isPresaleActive ? `${state.presale.round.toUpperCase()} ACTIVE` : 'PAUSED'}
+          </span>
         </div>
 
-        {/* Allocation Numbers in Recessed Wells */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-3.5 mb-5">
-          <div className="recessed-well rounded-2xl p-3.5 sm:p-4 border border-[#21262D]">
-            <div className="text-[10px] sm:text-[11px] text-[#8B949E] uppercase tracking-wider mb-1 font-semibold">
+        {/* Allocation Numbers in Clean Sub-Boxes */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4">
+          {/* Round Allocation Well */}
+          <div className="bg-[#12161A]/80 border border-white/5 rounded-xl p-3 flex flex-col justify-between min-h-[90px] h-auto">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
               ROUND ALLOCATION
             </div>
-            <div className="text-lg sm:text-2xl font-mono font-black text-[#F0F6FC]">
-              {allocation.toLocaleString()} <span className="text-[10px] sm:text-xs text-[#8B949E] font-sans">AURI</span>
+            <div className="text-lg font-bold text-white my-0.5 flex items-baseline gap-1 font-mono">
+              <span>{allocation.toLocaleString()}</span>
+              <span className="text-[10px] text-gray-400 font-normal">AURI</span>
             </div>
-            <div className="text-[10px] text-[#58A6FF] font-mono mt-1 uppercase">
+            <div className="text-[10px] text-[#58A6FF] font-mono leading-tight mt-1">
               1 AURI = ${state.presale.rateUsdtPerAuri}
             </div>
           </div>
 
-          <div className="recessed-well rounded-2xl p-3.5 sm:p-4 border border-[#21262D]">
-            <div className="text-[10px] sm:text-[11px] text-[#8B949E] uppercase tracking-wider mb-1 font-semibold">
+          {/* Min Deposit Well */}
+          <div className="bg-[#12161A]/80 border border-white/5 rounded-xl p-3 flex flex-col justify-between min-h-[90px] h-auto">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
               MIN. DEPOSIT
             </div>
-            <div className="text-lg sm:text-2xl font-mono font-black text-[#F5A623] gold-glow-text">
-              ${state.presale.minDepositUsdt} <span className="text-[10px] sm:text-xs text-[#8B949E] font-sans">USDT</span>
+            <div className="text-lg font-bold text-[#F5A623] my-0.5 flex items-baseline gap-1 font-mono gold-glow-text">
+              <span>${state.presale.minDepositUsdt}</span>
+              <span className="text-[10px] text-gray-400 font-normal">USDT</span>
             </div>
-            <div className="text-[10px] text-[#8B949E] mt-1 uppercase">
-              Instant Quota
+            <div className="text-[10px] text-gray-400 font-medium leading-tight mt-1">
+              Instant Allocation Quota
             </div>
           </div>
         </div>

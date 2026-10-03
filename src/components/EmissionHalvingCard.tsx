@@ -20,21 +20,22 @@ export const EmissionHalvingCard: React.FC<EmissionHalvingCardProps> = ({ state 
       <div className="absolute top-0 right-1/4 w-52 h-52 bg-[#F5A623]/10 blur-[90px] pointer-events-none rounded-full" />
 
       <div>
-        {/* Card Header */}
-        <div className="flex items-center justify-between gap-3 mb-6">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-[#8B949E] font-semibold">
-              EMISSION SCHEDULE
+        {/* Card Header: Strict flex container with padding matching Cards 1 & 3 */}
+        <div className="flex items-center justify-between gap-2 px-1 mb-4 w-full">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl recessed-well border border-[#21262D] flex items-center justify-center text-[#F5A623] shrink-0">
+              <Flame className="w-4 h-4 sm:w-5 sm:h-5 drop-shadow-[0_0_8px_rgba(245,166,35,0.6)]" />
             </div>
-            <h3 className="text-lg sm:text-xl font-extrabold text-[#F0F6FC] font-sans">
-              Algorithmic Halving
-            </h3>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">EMISSION SCHEDULE</p>
+              <h3 className="text-lg font-bold text-[#F0F6FC] tracking-tight">Algorithmic Halving</h3>
+            </div>
           </div>
 
-          <div className="px-3 py-1 rounded-full recessed-well border border-[#21262D] text-xs font-mono text-[#F5A623] flex items-center gap-1.5 shrink-0">
-            <Flame className="w-3.5 h-3.5 text-[#F5A623]" />
+          <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold font-mono tracking-wider text-[#F5A623] bg-[#F5A623]/10 border border-[#F5A623]/30 whitespace-nowrap flex items-center gap-1.5">
+            <Flame className="w-3 h-3 text-[#F5A623]" />
             <span>ERA {state.halving.currentEra}</span>
-          </div>
+          </span>
         </div>
 
         {/* Concentric Circular Orbital Gauge with Responsive Scaling */}

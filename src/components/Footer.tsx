@@ -1,14 +1,15 @@
 import React from 'react';
-import { ShieldCheck, Smartphone } from 'lucide-react';
+import { ShieldCheck, Smartphone, Lock } from 'lucide-react';
 import { AuriumState } from '../types';
 import { AuriumLogo } from './AuriumLogo';
 
 interface FooterProps {
   state: AuriumState;
   onOpenApkModal: () => void;
+  onOpenAdmin: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ state, onOpenApkModal }) => {
+export const Footer: React.FC<FooterProps> = ({ state, onOpenApkModal, onOpenAdmin }) => {
   return (
     <footer className="bg-[#070A0E] border-t border-[#1F2736] text-[#8B949E] text-xs pt-16 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -53,12 +54,12 @@ export const Footer: React.FC<FooterProps> = ({ state, onOpenApkModal }) => {
 
           {/* Col 3: Resources & Verification */}
           <div className="space-y-2.5">
-            <div className="text-xs font-bold text-[#F0F6FC] uppercase tracking-widest">Resources</div>
+            <div className="text-xs font-bold text-[#F0F6FC] uppercase tracking-widest">Resources & Ops</div>
             <ul className="space-y-2">
               <li>
                 <button
                   onClick={onOpenApkModal}
-                  className="hover:text-[#F0F6FC] transition-colors text-left flex items-center gap-1.5"
+                  className="hover:text-[#F0F6FC] transition-colors text-left flex items-center gap-1.5 cursor-pointer"
                 >
                   <Smartphone className="w-3.5 h-3.5 text-[#F5A623]" />
                   <span>Download Signed APK ({state.apk.version})</span>
@@ -105,8 +106,18 @@ export const Footer: React.FC<FooterProps> = ({ state, onOpenApkModal }) => {
           <div>
             &copy; 2026 Aurium Protocol Foundation. All cryptographic rights reserved.
           </div>
-          <div className="text-[#8B949E] text-center sm:text-right font-mono">
-            Decentralized Mobile Consensus Layer · PoMU Engine
+          <div className="flex items-center gap-3 text-[#8B949E] text-center sm:text-right font-mono">
+            <span>Decentralized Mobile Consensus Layer · PoMU Engine</span>
+            <span>·</span>
+            {/* Subtle, low-key link at the very bottom of the page */}
+            <button
+              onClick={onOpenAdmin}
+              className="text-gray-700 hover:text-gray-500 transition-colors cursor-pointer flex items-center gap-1 text-[11px]"
+              title="Admin Access"
+            >
+              <Lock className="w-2.5 h-2.5" />
+              <span>Admin Access</span>
+            </button>
           </div>
         </div>
       </div>

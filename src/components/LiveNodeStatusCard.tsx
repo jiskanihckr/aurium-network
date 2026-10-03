@@ -32,72 +32,68 @@ export const LiveNodeStatusCard: React.FC<LiveNodeStatusCardProps> = ({ state, o
       <div className="absolute bottom-0 left-0 w-36 h-36 bg-[#58A6FF]/10 blur-[75px] pointer-events-none rounded-full" />
 
       <div>
-        {/* Header Line */}
-        <div className="flex items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl recessed-well border border-[#21262D] flex items-center justify-center text-[#F5A623] shrink-0">
-              <Server className="w-5 h-5 drop-shadow-[0_0_8px_rgba(245,166,35,0.6)]" />
+        {/* Header Line: Strict flex container with padding and zero overflow */}
+        <div className="flex items-center justify-between gap-2 px-1 mb-4 w-full">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl recessed-well border border-[#21262D] flex items-center justify-center text-[#F5A623] shrink-0">
+              <Server className="w-4 h-4 sm:w-5 sm:h-5 drop-shadow-[0_0_8px_rgba(245,166,35,0.6)]" />
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] text-[#8B949E] font-semibold">
-                NODE STATUS
-              </div>
-              <h3 className="text-lg sm:text-xl font-extrabold text-[#F0F6FC] font-sans">
-                Light Validator
-              </h3>
+              <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">NODE STATUS</p>
+              <h3 className="text-lg font-bold text-[#F0F6FC] tracking-tight">Light Validator</h3>
             </div>
           </div>
 
-          {/* Pulse Status Badge in Pill Capsule */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full recessed-well border border-[#21262D] shrink-0">
+          {/* Pulse Status Badge */}
+          <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider flex items-center gap-1.5 border whitespace-nowrap bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
             {isOnline ? (
               <>
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#238636] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#238636]"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className="text-[11px] sm:text-xs font-bold text-[#238636] tracking-wider uppercase">ONLINE</span>
+                <span>ONLINE</span>
               </>
             ) : (
               <>
                 <span className="relative flex h-2 w-2">
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                 </span>
-                <span className="text-[11px] sm:text-xs font-bold text-amber-400 tracking-wider uppercase">PAUSED</span>
+                <span className="text-amber-400">PAUSED</span>
               </>
             )}
-          </div>
+          </span>
         </div>
 
-        {/* Primary Numbers in Recessed Wells */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-5">
-          {/* Yield Stat Well */}
-          <div className="recessed-well rounded-2xl p-4 border border-[#21262D]">
-            <div className="text-[11px] text-[#8B949E] uppercase tracking-wider mb-1 flex items-center gap-1.5 font-semibold">
+        {/* Primary Numbers in Clean Sub-Cards with Proper Auto-Height */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4">
+          {/* Daily Base Yield Well */}
+          <div className="bg-[#12161A]/80 border border-white/5 rounded-xl p-3 flex flex-col justify-between min-h-[90px] h-auto">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 font-medium flex items-center gap-1">
               <span>DAILY BASE YIELD</span>
               <Zap className="w-3 h-3 text-[#F5A623]" />
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-[#F5A623] font-mono tracking-tight gold-glow-text flex items-baseline gap-1">
-              +{state.network.baseDailyYield.toFixed(2)}
-              <span className="text-xs font-semibold text-[#8B949E] font-sans">AURI/day</span>
+            <div className="text-lg font-bold text-[#F5A623] my-0.5 flex items-baseline gap-1 font-mono gold-glow-text">
+              <span>+{state.network.baseDailyYield.toFixed(2)}</span>
+              <span className="text-[10px] text-gray-400 font-normal">AURI/day</span>
             </div>
-            <div className="text-[10px] text-[#238636] font-mono mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
+            <div className="text-[10px] text-emerald-400/90 font-medium leading-tight mt-1 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3 shrink-0" />
               <span>Autocompounding per epoch</span>
             </div>
           </div>
 
           {/* Active Nodes Stat Well */}
-          <div className="recessed-well rounded-2xl p-4 border border-[#21262D]">
-            <div className="text-[11px] text-[#8B949E] uppercase tracking-wider mb-1 flex items-center gap-1.5 font-semibold">
+          <div className="bg-[#12161A]/80 border border-white/5 rounded-xl p-3 flex flex-col justify-between min-h-[90px] h-auto">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 font-medium flex items-center justify-between">
               <span>ACTIVE NODES</span>
               <Activity className="w-3 h-3 text-[#58A6FF]" />
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-[#F0F6FC] font-mono tracking-tight flex items-baseline gap-1">
-              {state.network.activeNodes.toLocaleString()}
-              <span className="text-xs font-semibold text-[#8B949E] font-sans">Nodes</span>
+            <div className="text-lg font-bold text-white my-0.5 flex items-baseline gap-1 font-mono">
+              <span>{state.network.activeNodes.toLocaleString()}</span>
+              <span className="text-[10px] text-gray-400 font-normal">Nodes</span>
             </div>
-            <div className="text-[10px] text-[#8B949E] mt-1 uppercase tracking-wider">
+            <div className="text-[10px] text-gray-400 font-medium leading-tight mt-1">
               142 Countries Verified
             </div>
           </div>

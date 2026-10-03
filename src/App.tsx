@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuriumState } from './hooks/useAuriumState';
+import { useSupabaseAuth } from './hooks/useSupabaseAuth';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { LiveNodeStatusCard } from './components/LiveNodeStatusCard';
@@ -11,6 +12,8 @@ import { StepGuide } from './components/StepGuide';
 import { RoadmapSection } from './components/RoadmapSection';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { SupabaseAuthModal } from './components/SupabaseAuthModal';
+import { MobileAppContainer } from './components/MobileAppContainer';
 import { Footer } from './components/Footer';
 
 export default function App() {
@@ -28,23 +31,29 @@ export default function App() {
     resetToDefaults,
   } = useAuriumState();
 
-  const [activeView, setActiveView] = useState<'public' | 'admin'>('public');
+  const auth = useSupabaseAuth();
+
+  const [activeView, setActiveView] = useState<'public' | 'admin' | 'app'>('public');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isApkModalOpen, setIsApkModalOpen] = useState<boolean>(false);
   const [isPresaleModalOpen, setIsPresaleModalOpen] = useState<boolean>(false);
 
-  // Check URL pathname for /admin routing (strictly accessible via direct /admin path)
+  // Check URL pathname and query params for /admin or ?view=admin or ?view=app routing
   useEffect(() => {
     const handleLocation = () => {
       const path = window.location.pathname;
       const search = window.location.search;
+
       if (path.includes('/admin') || search.includes('view=admin')) {
         if (!isAdminAuthenticated) {
           setIsLoginModalOpen(true);
         } else {
           setActiveView('admin');
         }
+      } else if (search.includes('view=app') || path.includes('/app')) {
+        setActiveView('app');
       } else {
         setActiveView('public');
       }
@@ -62,6 +71,20 @@ export default function App() {
     window.history.pushState({}, '', '/admin');
   };
 
+  const handleOpenAdmin = () => {
+    if (!isAdminAuthenticated) {
+      setIsLoginModalOpen(true);
+    } else {
+      setActiveView('admin');
+      window.history.pushState({}, '', '/admin');
+    }
+  };
+
+  const handleLaunchApp = () => {
+    setActiveView('app');
+    window.history.pushState({}, '', '/?view=app');
+  };
+
   const handleBackToPublic = () => {
     setActiveView('public');
     window.history.pushState({}, '', '/');
@@ -69,10 +92,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#090C10] text-[#F0F6FC] selection:bg-[#F5A623]/30 selection:text-[#F5A623]">
-      {/* Header (Refined mobile spacing with compact pill badge) */}
+      {/* Header with Launch App, Admin Quick Switcher, & Supabase Auth integration */}
       <Header
         state={state}
         onOpenApkModal={() => setIsApkModalOpen(true)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onLaunchApp={handleLaunchApp}
+        onOpenAdmin={handleOpenAdmin}
+        auth={auth}
         activeView={activeView}
         setActiveView={handleBackToPublic}
         isConnected={isConnected}
@@ -93,6 +120,13 @@ export default function App() {
           resetToDefaults={resetToDefaults}
           isConnected={isConnected}
           lastSyncTime={lastSyncTime}
+        />
+      ) : activeView === 'app' ? (
+        <MobileAppContainer
+          state={state}
+          onBackToLanding={handleBackToPublic}
+          onOpenPresaleModal={() => setIsPresaleModalOpen(true)}
+          auth={auth}
         />
       ) : (
         <main>
@@ -132,13 +166,14 @@ export default function App() {
             onOpenPresaleModal={() => setIsPresaleModalOpen(true)}
           />
 
-          {/* Interactive Multi-Phase Roadmap */}
+          {/* Expanded Luxury Roadmap (Milestone Suspense Timeline) */}
           <RoadmapSection />
 
-          {/* Footer */}
+          {/* Footer with Developer Admin Portal trigger */}
           <Footer
             state={state}
             onOpenApkModal={() => setIsApkModalOpen(true)}
+            onOpenAdmin={handleOpenAdmin}
           />
         </main>
       )}
@@ -155,6 +190,13 @@ export default function App() {
         onClose={() => setIsPresaleModalOpen(false)}
         state={state}
         onSubmitTxid={submitDepositTxid}
+      />
+
+      {/* Supabase & Web3 Identity Auth Modal */}
+      <SupabaseAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        auth={auth}
       />
 
       {/* Protected Admin Access Modal triggered by direct /admin path */}
